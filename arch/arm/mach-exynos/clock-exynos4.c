@@ -159,6 +159,11 @@ static int exynos4_clk_ip_mfc_ctrl(struct clk *clk, int enable)
 	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_MFC, clk, enable);
 }
 
+static int exynos4_clk_ip_g3d_ctrl(struct clk *clk, int enable)
+{
+	return s5p_gatectrl(EXYNOS4_CLKGATE_IP_G3D, clk, enable);
+}
+
 static int exynos4_clksrc_mask_tv_ctrl(struct clk *clk, int enable)
 {
 	return s5p_gatectrl(EXYNOS4_CLKSRC_MASK_TV, clk, enable);
@@ -762,7 +767,17 @@ static struct clk exynos4_init_clocks_off[] = {
 		.name		= "SYSMMU_MFC_R",
 		.enable		= exynos4_clk_ip_mfc_ctrl,
 		.ctrlbit	= (1 << 2),
-	}
+	}, {
+                .name           = "geg3d",
+                .id             = -1,
+                .enable         = exynos4_clk_ip_g3d_ctrl,
+                .ctrlbit        = (0x1 << 2),
+        }, {
+                .name           = "ppmug3d",
+                .id             = -1,
+                .enable         = exynos4_clk_ip_g3d_ctrl,
+                .ctrlbit        = (0x1 << 1),
+        }
 };
 
 static struct clk exynos4_init_clocks_on[] = {
@@ -952,6 +967,54 @@ static struct clk *exynos4_clkset_mout_mfc_list[] = {
 static struct clksrc_sources exynos4_clkset_mout_mfc = {
 	.sources	= exynos4_clkset_mout_mfc_list,
 	.nr_sources	= ARRAY_SIZE(exynos4_clkset_mout_mfc_list),
+};
+
+static struct clk *exynos4_clkset_mout_g3d0_list[] = {
+        [0] = &exynos4_clk_mout_mpll.clk,
+        [1] = &exynos4_clk_sclk_apll.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_mout_g3d0 = {
+        .sources        = exynos4_clkset_mout_g3d0_list,
+        .nr_sources     = ARRAY_SIZE(exynos4_clkset_mout_g3d0_list),
+};
+
+static struct clksrc_clk exynos4_clk_mout_g3d0 = {
+        .clk    = {
+                .name           = "mout_g3d0",
+                .id             = -1,
+        },
+        .sources        = &exynos4_clkset_mout_g3d0,
+        .reg_src        = { .reg = EXYNOS4_CLKSRC_G3D, .shift = 0, .size = 1 },
+};
+
+static struct clk *exynos4_clkset_mout_g3d1_list[] = {
+        [0] = &exynos4_clk_mout_epll.clk,
+        [1] = &exynos4_clk_sclk_vpll.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_mout_g3d1 = {
+        .sources        = exynos4_clkset_mout_g3d1_list,
+        .nr_sources     = ARRAY_SIZE(exynos4_clkset_mout_g3d1_list),
+};
+
+static struct clksrc_clk exynos4_clk_mout_g3d1 = {
+        .clk    = {
+                .name           = "mout_g3d1",
+                .id             = -1,
+        },
+        .sources        = &exynos4_clkset_mout_g3d1,
+        .reg_src        = { .reg = EXYNOS4_CLKSRC_G3D, .shift = 4, .size = 1 },
+};
+
+static struct clk *exynos4_clkset_mout_g3d_list[] = {
+        [0] = &exynos4_clk_mout_g3d0.clk,
+        [1] = &exynos4_clk_mout_g3d1.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_mout_g3d = {
+        .sources        = exynos4_clkset_mout_g3d_list,
+        .nr_sources     = ARRAY_SIZE(exynos4_clkset_mout_g3d_list),
 };
 
 static struct clk *exynos4_clkset_sclk_dac_list[] = {
@@ -1188,6 +1251,16 @@ static struct clksrc_clk exynos4_clksrcs[] = {
 		.reg_src = { .reg = EXYNOS4_CLKSRC_MFC, .shift = 8, .size = 1 },
 		.reg_div = { .reg = EXYNOS4_CLKDIV_MFC, .shift = 0, .size = 4 },
 	}, {
+		.clk            = {
+			.name           = "sclk_g3d",
+			.id             = -1,
+			.enable         = exynos4_clk_ip_g3d_ctrl,
+			.ctrlbit        = (1 << 0),
+		},
+		.sources = &exynos4_clkset_mout_g3d,
+		.reg_src = { .reg = EXYNOS4_CLKSRC_G3D, .shift = 8, .size = 1 },
+		.reg_div = { .reg = EXYNOS4_CLKDIV_G3D, .shift = 0, .size = 4 },
+	}, {
 		.clk	= {
 			.name		= "sclk_dwmmc",
 			.parent		= &exynos4_clk_dout_mmc4.clk,
@@ -1373,6 +1446,8 @@ static struct clksrc_clk *exynos4_sysclks[] = {
 	&exynos4_clk_dout_mmc4,
 	&exynos4_clk_mout_mfc0,
 	&exynos4_clk_mout_mfc1,
+	&exynos4_clk_mout_g3d0,
+	&exynos4_clk_mout_g3d1,
 };
 
 static struct clk *exynos4_clk_cdev[] = {
