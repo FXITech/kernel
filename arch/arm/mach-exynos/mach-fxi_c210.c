@@ -33,7 +33,7 @@
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
 
-#include <video/lcd_pwrctrl.h>
+#include <video/platform_lcd.h>
 
 #include <plat/regs-serial.h>
 #include <plat/regs-fb-v4.h>
@@ -49,7 +49,6 @@
 #include <plat/fb.h>
 #include <plat/mfc.h>
 #include <plat/udc-hs.h>
-#include <plat/hdmi.h>
 
 #include <mach/ohci.h>
 #include <mach/map.h>
@@ -111,79 +110,77 @@ static struct s3c2410_uartcfg fxi_c210_uartcfgs[] __initdata = {
 	},
 };
 
-static struct regulator_consumer_supply __initdata ldo3_consumer[] = {
-  REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"), /* MIPI */
-  REGULATOR_SUPPLY("vdd", "exynos4-hdmi"), /* HDMI */
-  REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"), /* HDMI */
+static struct regulator_consumer_supply ldo1_consumer[] = {
+  REGULATOR_SUPPLY("vdd", "s5p-adc"), /* ADC */
+  REGULATOR_SUPPLY("vdd_osc", "exynos4-hdmi"),
 };
-static struct regulator_consumer_supply __initdata ldo6_consumer[] = {
+static struct regulator_consumer_supply ldo3_consumer[] = {
+  REGULATOR_SUPPLY("vusb_d", "s3c-hsotg"), /* USB */
+  REGULATOR_SUPPLY("vusb_a", "s3c-hsotg"), /* USB */ // FIXME
+  REGULATOR_SUPPLY("vdd", "exynos4-hdmi"), /* HDMI */
+  REGULATOR_SUPPLY("hdmi-en", "exynos4-hdmi"), /* HDMI */
+  REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"), /* HDMI */
+  REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"), /* MIPI */
+  REGULATOR_SUPPLY("vmmc", NULL), /* sdhc-drivers want it, this is always on so we just hook it up */
+};
+static struct regulator_consumer_supply ldo4_consumer[] = {
   REGULATOR_SUPPLY("vdd18", "s5p-mipi-csis.0"), /* MIPI */
 };
-static struct regulator_consumer_supply __initdata ldo7_consumer[] = {
-  REGULATOR_SUPPLY("avdd", "alc5625"), /* Realtek ALC5625 */
+
+static struct regulator_consumer_supply buck1_consumer[] = {
+  REGULATOR_SUPPLY("vdd_arm", NULL),
 };
-static struct regulator_consumer_supply __initdata ldo8_consumer[] = {
-  REGULATOR_SUPPLY("vdd", "s5p-adc"), /* ADC */
-  REGULATOR_SUPPLY("vdd_osc", "exynos4-hdmi"), /* HDMI */
+
+static struct regulator_consumer_supply buck2_consumer[] = {
+  REGULATOR_SUPPLY("vdd_int", NULL),
 };
-static struct regulator_consumer_supply __initdata ldo9_consumer[] = {
-  REGULATOR_SUPPLY("dvdd", "swb-a31"), /* AR6003 WLAN & CSR 8810 BT */
-};
-static struct regulator_consumer_supply __initdata ldo11_consumer[] = {
-  REGULATOR_SUPPLY("dvdd", "alc5625"), /* Realtek ALC5625 */
-};
-static struct regulator_consumer_supply __initdata ldo14_consumer[] = {
-  REGULATOR_SUPPLY("avdd18", "swb-a31"), /* AR6003 WLAN & CSR 8810 BT */
-};
-static struct regulator_consumer_supply __initdata ldo17_consumer[] = {
-  REGULATOR_SUPPLY("vdd33", "swb-a31"), /* AR6003 WLAN & CSR 8810 BT */
-};
-static struct regulator_consumer_supply __initdata buck1_consumer[] = {
-  REGULATOR_SUPPLY("vdd_arm", NULL), /* CPUFREQ */
-};
-static struct regulator_consumer_supply __initdata buck2_consumer[] = {
-  REGULATOR_SUPPLY("vdd_int", NULL), /* CPUFREQ */
-};
+
 static struct regulator_consumer_supply __initdata buck3_consumer[] = {
   REGULATOR_SUPPLY("vdd_g3d", "mali_drm"), /* G3D */
 };
-static struct regulator_consumer_supply __initdata buck7_consumer[] = {
-  REGULATOR_SUPPLY("vcc-lcd", "lcd-pwrctrl.0"), /* LCD */
-};
 
-static struct regulator_init_data __initdata max8997_ldo1_data = {
+static struct regulator_init_data max8997_ldo1_data = {
   .constraints  = {
-    .name   = "VDD_ABB_3.3V",
+    .name   = "VDD_ADC_3.3V",
     .min_uV   = 3300000,
     .max_uV   = 3300000,
     .apply_uV = 1,
+    .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
     .state_mem  = {
-      .disabled = 1,
+      .uV   = 3300000,
+      .enabled = 1,
     },
   },
+  .num_consumer_supplies  = ARRAY_SIZE(ldo1_consumer),
+  .consumer_supplies  = ldo1_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_ldo2_data  = {
+static struct regulator_init_data max8997_ldo2_data = {
   .constraints  = {
-    .name   = "VDD_ALIVE_1.1V",
+    .name   = "VALIVE_1.1V",
     .min_uV   = 1100000,
     .max_uV   = 1100000,
     .apply_uV = 1,
     .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
     .state_mem  = {
-      .enabled  = 1,
+      .uV   = 1100000,
+      .enabled = 1,
     },
   },
 };
 
-static struct regulator_init_data __initdata max8997_ldo3_data = {
+static struct regulator_init_data max8997_ldo3_data = {
   .constraints  = {
-    .name   = "VMIPI_1.1V",
+    .name   = "VUOTG_D_1.1V/VUHOST_D_1.1V",
     .min_uV   = 1100000,
     .max_uV   = 1100000,
     .apply_uV = 1,
+    .always_on  = 1,
     .valid_ops_mask = REGULATOR_CHANGE_STATUS,
     .state_mem  = {
+      .uV   = 1100000,
       .disabled = 1,
     },
   },
@@ -191,164 +188,138 @@ static struct regulator_init_data __initdata max8997_ldo3_data = {
   .consumer_supplies  = ldo3_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_ldo4_data = {
+static struct regulator_init_data max8997_ldo4_data = {
   .constraints  = {
-    .name   = "VDD_RTC_1.8V",
-    .min_uV   = 1800000,
-    .max_uV   = 1800000,
-    .apply_uV = 1,
-    .always_on  = 1,
-    .state_mem  = {
-      .disabled = 1,
-    },
-  },
-};
-
-static struct regulator_init_data __initdata max8997_ldo6_data = {
-  .constraints  = {
-    .name   = "VMIPI_1.8V",
-    .min_uV   = 1800000,
-    .max_uV   = 1800000,
-    .apply_uV = 1,
-    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
-    .state_mem  = {
-      .disabled = 1,
-    },
-  },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo6_consumer),
-  .consumer_supplies  = ldo6_consumer,
-};
-
-static struct regulator_init_data __initdata max8997_ldo7_data = {
-  .constraints  = {
-    .name   = "VDD_AUD_1.8V",
+    .name   = "V_MIPI_1.8V",
     .min_uV   = 1800000,
     .max_uV   = 1800000,
     .apply_uV = 1,
     .always_on  = 1,
     .valid_ops_mask = REGULATOR_CHANGE_STATUS,
     .state_mem  = {
+      .uV   = 1800000,
       .disabled = 1,
     },
   },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo7_consumer),
-  .consumer_supplies  = ldo7_consumer,
+  .num_consumer_supplies  = ARRAY_SIZE(ldo4_consumer),
+  .consumer_supplies  = ldo4_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_ldo8_data = {
+static struct regulator_init_data max8997_ldo5_data = {
   .constraints  = {
-    .name   = "VADC_3.3V",
+    .name   = "VDD_MIF_1.8V",
+    .min_uV   = 1800000,
+    .max_uV   = 1800000,
+    .apply_uV = 1,
+    .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
+    .state_mem  = {
+      .uV   = 1800000,
+      .disabled = 1,
+    },
+  },
+};
+
+static struct regulator_init_data max8997_ldo6_data = {
+  .constraints  = {
+    .name   = "VDD_CAM_1.8V",
+    .min_uV   = 1800000,
+    .max_uV   = 1800000,
+    .apply_uV = 1,
+    .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
+    .state_mem   = {
+      .uV   = 1800000,
+      .disabled = 1,
+    },
+  },
+};
+
+static struct regulator_init_data max8997_ldo7_data = {
+  .constraints  = {
+    .name   = "VDD_GPS_1.8V",
+    .min_uV   = 1800000,
+    .max_uV   = 1800000,
+    .apply_uV = 1,
+    .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
+    .state_mem  = {
+      .uV   = 1800000,
+      .disabled = 1,
+    },
+  },
+};
+
+static struct regulator_init_data max8997_ldo8_data = {
+  .constraints  = {
+    .name   = "VUOTG_A_3.3V/VUHOST_A_3.3V",
     .min_uV   = 3300000,
     .max_uV   = 3300000,
     .apply_uV = 1,
-    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
-    .state_mem  = {
-      .disabled = 1,
-    },
-  },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo8_consumer),
-  .consumer_supplies  = ldo8_consumer,
-};
-
-static struct regulator_init_data __initdata max8997_ldo9_data = {
-  .constraints  = {
-    .name   = "DVDD_SWB_2.8V",
-    .min_uV   = 2800000,
-    .max_uV   = 2800000,
-    .apply_uV = 1,
     .always_on  = 1,
     .valid_ops_mask = REGULATOR_CHANGE_STATUS,
     .state_mem  = {
-      .disabled = 1,
+      .uV   = 3300000,
+      .enabled = 1,
     },
   },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo9_consumer),
-  .consumer_supplies  = ldo9_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_ldo10_data = {
+static struct regulator_init_data max8997_ldo9_data = {
+  .constraints  = {
+    .name   = "VDD_LCD_2.8V",
+    .min_uV   = 3000000,
+    .max_uV   = 3000000,
+    .apply_uV = 1,
+    .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
+    .state_mem  = {
+      .uV   = 3000000,
+      .enabled = 1,
+    },
+  },
+};
+
+static struct regulator_init_data max8997_ldo10_data = {
   .constraints  = {
     .name   = "VDD_PLL_1.1V",
     .min_uV   = 1100000,
     .max_uV   = 1100000,
     .apply_uV = 1,
     .always_on  = 1,
+    .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
     .state_mem  = {
-      .disabled = 1,
+      .uV   = 1100000,
+      .enabled = 1,
     },
   },
 };
 
-static struct regulator_init_data __initdata max8997_ldo11_data = {
+static struct regulator_init_data max8997_ldo17_data = {
   .constraints  = {
-    .name   = "VDD_AUD_3V",
-    .min_uV   = 3000000,
-    .max_uV   = 3000000,
-    .apply_uV = 1,
-    .always_on  = 1,
-    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
-    .state_mem  = {
-      .disabled = 1,
-    },
-  },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo11_consumer),
-  .consumer_supplies  = ldo11_consumer,
-};
-
-static struct regulator_init_data __initdata max8997_ldo14_data = {
-  .constraints  = {
-    .name   = "AVDD18_SWB_1.8V",
+    .name   = "VDD_WIFI_1.8V",
     .min_uV   = 1800000,
     .max_uV   = 1800000,
     .apply_uV = 1,
     .always_on  = 1,
-    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
+    .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
     .state_mem  = {
-      .disabled = 1,
-    },
-  },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo14_consumer),
-  .consumer_supplies  = ldo14_consumer,
-};
-
-static struct regulator_init_data __initdata max8997_ldo17_data = {
-  .constraints  = {
-    .name   = "VDD_SWB_3.3V",
-    .min_uV   = 3300000,
-    .max_uV   = 3300000,
-    .apply_uV = 1,
-    .always_on  = 1,
-    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
-    .state_mem  = {
-      .disabled = 1,
-    },
-  },
-  .num_consumer_supplies  = ARRAY_SIZE(ldo17_consumer),
-  .consumer_supplies  = ldo17_consumer,
-};
-
-static struct regulator_init_data __initdata max8997_ldo21_data = {
-  .constraints  = {
-    .name   = "VDD_MIF_1.2V",
-    .min_uV   = 1200000,
-    .max_uV   = 1200000,
-    .apply_uV = 1,
-    .always_on  = 1,
-    .state_mem  = {
-      .disabled = 1,
+      .uV   = 1800000,
+      .enabled = 1,
     },
   },
 };
 
-static struct regulator_init_data __initdata max8997_buck1_data = {
+static struct regulator_init_data max8997_buck1_data = {
   .constraints  = {
-    .name   = "VDD_ARM_1.2V",
-    .min_uV   = 950000,
-    .max_uV   = 1350000,
+    .name   = "vdd_arm range",
+    .min_uV   = 770000,
+    .max_uV   = 1400000,
     .always_on  = 1,
     .boot_on  = 1,
     .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
     .state_mem  = {
+      .uV   = 1200000,
       .disabled = 1,
     },
   },
@@ -356,15 +327,16 @@ static struct regulator_init_data __initdata max8997_buck1_data = {
   .consumer_supplies  = buck1_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_buck2_data = {
+static struct regulator_init_data max8997_buck2_data = {
   .constraints  = {
-    .name   = "VDD_INT_1.1V",
-    .min_uV   = 900000,
-    .max_uV   = 1100000,
+    .name   = "vdd_int range",
+    .min_uV   = 750000,
+    .max_uV   = 1380000,
     .always_on  = 1,
     .boot_on  = 1,
     .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE,
     .state_mem  = {
+      .uV   = 1100000,
       .disabled = 1,
     },
   },
@@ -372,14 +344,17 @@ static struct regulator_init_data __initdata max8997_buck2_data = {
   .consumer_supplies  = buck2_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_buck3_data = {
+static struct regulator_init_data max8997_buck3_data = {
   .constraints  = {
-    .name   = "VDD_G3D_1.1V",
+    .name   = "vdd_g3d range",
     .min_uV   = 900000,
-    .max_uV   = 1100000,
+    .max_uV   = 1200000,
+    .always_on  = 1,
+    .boot_on  = 0,
     .valid_ops_mask = REGULATOR_CHANGE_VOLTAGE |
-          REGULATOR_CHANGE_STATUS,
+    REGULATOR_CHANGE_STATUS,
     .state_mem  = {
+      .uV   = 1100000,
       .disabled = 1,
     },
   },
@@ -387,35 +362,35 @@ static struct regulator_init_data __initdata max8997_buck3_data = {
   .consumer_supplies  = buck3_consumer,
 };
 
-static struct regulator_init_data __initdata max8997_buck5_data = {
+static struct regulator_init_data max8997_buck5_data = {
   .constraints  = {
-    .name   = "VDDQ_M1M2_1.2V",
+    .name   = "VDD_MEM",
     .min_uV   = 1200000,
     .max_uV   = 1200000,
     .apply_uV = 1,
     .always_on  = 1,
     .state_mem  = {
-      .disabled = 1,
+      .uV = 1200000,
+      .mode = REGULATOR_MODE_NORMAL,
+      .enabled = 1,
     },
   },
 };
 
-static struct regulator_init_data __initdata max8997_buck7_data = {
+static struct regulator_init_data max8997_buck7_data = {
   .constraints  = {
-    .name   = "VDD_LCD_2.8V",
-    .min_uV   = 3000000,
-    .max_uV   = 3000000,
-    .boot_on  = 1,
-    .always_on = 1,
+    .name   = "VDD_IO_1.8V",
+    .min_uV   = 1800000,
+    .max_uV   = 1800000,
+    .always_on  = 1,
     .apply_uV = 1,
     .valid_ops_mask = REGULATOR_CHANGE_STATUS,
     .state_mem  = {
-      .uV = 3000000,
-      .enabled = 1
+      .uV = 1800000,
+      .mode = REGULATOR_MODE_NORMAL,
+      .enabled = 1,
     },
   },
-  .num_consumer_supplies  = ARRAY_SIZE(buck7_consumer),
-  .consumer_supplies  = buck7_consumer,
 };
 
 static struct max8997_regulator_data __initdata fxi_c210_max8997_regulators[] = {
@@ -423,22 +398,20 @@ static struct max8997_regulator_data __initdata fxi_c210_max8997_regulators[] = 
   { MAX8997_LDO2,   &max8997_ldo2_data },
   { MAX8997_LDO3,   &max8997_ldo3_data },
   { MAX8997_LDO4,   &max8997_ldo4_data },
+  { MAX8997_LDO5,   &max8997_ldo5_data },
   { MAX8997_LDO6,   &max8997_ldo6_data },
   { MAX8997_LDO7,   &max8997_ldo7_data },
   { MAX8997_LDO8,   &max8997_ldo8_data },
   { MAX8997_LDO9,   &max8997_ldo9_data },
   { MAX8997_LDO10,  &max8997_ldo10_data },
-  { MAX8997_LDO11,  &max8997_ldo11_data },
-  { MAX8997_LDO14,  &max8997_ldo14_data },
-  { MAX8997_LDO17,  &max8997_ldo17_data },
-  { MAX8997_LDO21,  &max8997_ldo21_data },
+  { MAX8997_LDO10,  &max8997_ldo17_data },
+
   { MAX8997_BUCK1,  &max8997_buck1_data },
   { MAX8997_BUCK2,  &max8997_buck2_data },
   { MAX8997_BUCK3,  &max8997_buck3_data },
   { MAX8997_BUCK5,  &max8997_buck5_data },
   { MAX8997_BUCK7,  &max8997_buck7_data },
 };
-
 
 struct max8997_platform_data __initdata fxi_c210_max8997_pdata = {
   .num_regulators = ARRAY_SIZE(fxi_c210_max8997_regulators),
@@ -709,47 +682,59 @@ static struct platform_device fxi_c210_device_gpiokeys = {
 		.platform_data	= &fxi_c210_gpio_keys_data,
 	},
 };
+#if 0
+static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
+{
+	int ret;
 
-static struct lcd_pwrctrl_data fxi_c210_hv070wsa_data = {
-  .gpio = EXYNOS4_GPE3(4),
+	if (power)
+		ret = gpio_request_one(EXYNOS4_GPE3(4),
+					GPIOF_OUT_INIT_HIGH, "GPE3_4");
+	else
+		ret = gpio_request_one(EXYNOS4_GPE3(4),
+					GPIOF_OUT_INIT_LOW, "GPE3_4");
+
+	gpio_free(EXYNOS4_GPE3(4));
+
+	if (ret)
+		pr_err("failed to request gpio for LCD power: %d\n", ret);
+}
+
+static struct plat_lcd_data fxi_c210_lcd_hv070wsa_data = {
+	.set_power = lcd_hv070wsa_set_power,
+	.min_uV		= 3300000,
+	.max_uV		= 3300000,
 };
 
 static struct platform_device fxi_c210_lcd_hv070wsa = {
-  .name     = "lcd-pwrctrl",
-  .dev.parent   = &s5p_device_fimd0.dev,
-  .dev.platform_data  = &fxi_c210_hv070wsa_data,
+	.name			= "platform-lcd",
+	.dev.parent		= &s5p_device_fimd0.dev,
+	.dev.platform_data	= &fxi_c210_lcd_hv070wsa_data,
 };
 
 static struct s3c_fb_pd_win fxi_c210_fb_win0 = {
-  .xres     = 1024,
-  .yres     = 600,
-  .max_bpp    = 32,
-  .default_bpp    = 24,
-  .virtual_x    = 1024,
-  .virtual_y    = 2 * 600,
+	.win_mode = {
+		.left_margin	= 64,
+		.right_margin	= 16,
+		.upper_margin	= 64,
+		.lower_margin	= 16,
+		.hsync_len	= 48,
+		.vsync_len	= 3,
+		.xres		= 1024,
+		.yres		= 600,
+	},
+	.max_bpp		= 32,
+	.default_bpp		= 24,
 };
-
-static struct fb_videomode fxi_c210_lcd_timing = {
-  .left_margin  = 64,
-  .right_margin = 16,
-  .upper_margin = 64,
-  .lower_margin = 16,
-  .hsync_len  = 48,
-  .vsync_len  = 3,
-  .xres   = 1024,
-  .yres   = 600,
-};
-
 
 static struct s3c_fb_platdata fxi_c210_lcd_pdata __initdata = {
-  .win[0]   = &fxi_c210_fb_win0,
-  .vtiming  = &fxi_c210_lcd_timing,
-  .vidcon0  = VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
-  .vidcon1  = VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
-        VIDCON1_INV_VCLK,
-  .setup_gpio = exynos4_fimd0_gpio_setup_24bpp,
+	.win[0]		= &fxi_c210_fb_win0,
+	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
+				VIDCON1_INV_VCLK,
+	.setup_gpio	= exynos4_fimd0_gpio_setup_24bpp,
 };
-
+#endif
 /* Bluetooth rfkill gpio platform data */
 struct rfkill_gpio_platform_data fxi_c210_bt_pdata = {
 	.reset_gpio	= EXYNOS4_GPX2(2),
@@ -818,15 +803,8 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&samsung_asoc_dma,
 	&exynos4_device_i2s0,
 	&exynos4_device_ohci,
-	/*&exynos4_device_pd[PD_LCD0],
-	&exynos4_device_pd[PD_TV],
-	&exynos4_device_pd[PD_G3D],
-	&exynos4_device_pd[PD_LCD1],
-	&exynos4_device_pd[PD_CAM],
-	&exynos4_device_pd[PD_GPS],
-	&exynos4_device_pd[PD_MFC],*/
 	&fxi_c210_device_gpiokeys,
-	&fxi_c210_lcd_hv070wsa,
+	//&fxi_c210_lcd_hv070wsa,
 	&fxi_c210_leds_gpio,
 	&fxi_c210_device_bluetooth,
 	&exynos4_device_tmu,
@@ -866,10 +844,6 @@ static void s5p_tv_setup(void)
 	s3c_gpio_setpull(EXYNOS4_GPX3(7), S3C_GPIO_PULL_NONE);
 }
 
-/* I2C module and id for HDMIPHY */
-static struct i2c_board_info hdmiphy_info = {
-  I2C_BOARD_INFO("hdmiphy", 0x38),
-};
 static void __init fxi_c210_map_io(void)
 {
 	exynos_init_io(NULL, 0);
@@ -918,11 +892,11 @@ static void __init fxi_c210_machine_init(void)
 
 	s5p_tv_setup();
 	s5p_i2c_hdmiphy_set_platdata(NULL);
-  s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
 
-	s5p_fimd0_set_platdata(&fxi_c210_lcd_pdata);
+//	s5p_fimd0_set_platdata(&fxi_c210_lcd_pdata);
 
-  platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
+	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
+
 
 	samsung_bl_set(&fxi_c210_bl_gpio_info, &fxi_c210_bl_data);
 

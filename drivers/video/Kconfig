@@ -2265,6 +2265,18 @@ config FB_VIRTUAL
 	  the vfb_enable=1 option.
 
 	  If unsure, say N.
+config FB_FXI
+  tristate "FXI FB support"
+  depends on VIDEOBUF2_CORE
+  select FB_CFB_FILLRECT
+  select FB_CFB_COPYAREA
+  select FB_CFB_IMAGEBLIT
+  ---help---
+    To compile this driver as a module, choose M here: the
+    module will be called vfb. In order to load it, you must use
+    the vfb_enable=1 option.
+
+    If unsure, say N.
 
 config XEN_FBDEV_FRONTEND
 	tristate "Xen virtual frame buffer support"

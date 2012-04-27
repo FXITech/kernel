@@ -161,7 +161,14 @@ obj-$(CONFIG_FB_BFIN_7393)        += bfin_adv7393fb.o
 obj-$(CONFIG_FB_MX3)		  += mx3fb.o
 obj-$(CONFIG_FB_DA8XX)		  += da8xx-fb.o
 obj-$(CONFIG_FB_MXS)		  += mxsfb.o
+# For FB_FXI
+#ifeq ($(CONFIG_SUPPORT_UMP),y)
+EXTRA_CFLAGS += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=1 -Idrivers/media/video/samsung/ump/include
+#else
+#EXTRA_CFLAGS += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=0
+#endif
 
+obj-$(CONFIG_FB_FXI)          += fxifb.o
 # the test framebuffer is last
 obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
 
