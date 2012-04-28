@@ -136,7 +136,7 @@ static struct regulator_consumer_supply buck2_consumer[] = {
 };
 
 static struct regulator_consumer_supply __initdata buck3_consumer[] = {
-  REGULATOR_SUPPLY("vdd_g3d", "mali_drm"), /* G3D */
+  REGULATOR_SUPPLY("vdd_g3d", NULL), /* G3D */
 };
 
 static struct regulator_init_data max8997_ldo1_data = {
