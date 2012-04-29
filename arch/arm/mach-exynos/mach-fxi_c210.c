@@ -173,7 +173,7 @@ static struct regulator_init_data max8997_ldo2_data = {
 
 static struct regulator_init_data max8997_ldo3_data = {
   .constraints  = {
-    .name   = "VUOTG_D_1.1V/VUHOST_D_1.1V",
+    .name   = "VUOTG_D_1.1V_VUHOST_D_1.1V",
     .min_uV   = 1100000,
     .max_uV   = 1100000,
     .apply_uV = 1,
@@ -252,7 +252,7 @@ static struct regulator_init_data max8997_ldo7_data = {
 
 static struct regulator_init_data max8997_ldo8_data = {
   .constraints  = {
-    .name   = "VUOTG_A_3.3V/VUHOST_A_3.3V",
+    .name   = "VUOTG_A_3.3V_VUHOST_A_3.3V",
     .min_uV   = 3300000,
     .max_uV   = 3300000,
     .apply_uV = 1,
@@ -312,7 +312,7 @@ static struct regulator_init_data max8997_ldo17_data = {
 
 static struct regulator_init_data max8997_buck1_data = {
   .constraints  = {
-    .name   = "vdd_arm range",
+    .name   = "vdd_arm",
     .min_uV   = 770000,
     .max_uV   = 1400000,
     .always_on  = 1,
@@ -329,7 +329,7 @@ static struct regulator_init_data max8997_buck1_data = {
 
 static struct regulator_init_data max8997_buck2_data = {
   .constraints  = {
-    .name   = "vdd_int range",
+    .name   = "vdd_int",
     .min_uV   = 750000,
     .max_uV   = 1380000,
     .always_on  = 1,
@@ -346,7 +346,7 @@ static struct regulator_init_data max8997_buck2_data = {
 
 static struct regulator_init_data max8997_buck3_data = {
   .constraints  = {
-    .name   = "vdd_g3d range",
+    .name   = "vdd_g3d",
     .min_uV   = 900000,
     .max_uV   = 1200000,
     .always_on  = 1,
