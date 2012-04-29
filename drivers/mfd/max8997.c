@@ -164,8 +164,8 @@ static struct max8997_platform_data *max8997_i2c_parse_dt_pdata(
 	return pd;
 }
 #else
-static int max8997_i2c_parse_dt_pdata(struct device *dev,
-					struct max8997_platform_data **pdata)
+static struct max8997_platform_data *max8997_i2c_parse_dt_pdata(
+					struct device *dev)
 {
 	return 0;
 }
