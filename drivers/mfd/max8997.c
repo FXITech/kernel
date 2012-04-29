@@ -201,6 +201,7 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
 	max8997->type = max8997_i2c_get_driver_data(i2c, id);
 	max8997->irq = i2c->irq;
 
+#ifdef CONFIG_OF
 	if (max8997->dev->of_node) {
 		pdata = max8997_i2c_parse_dt_pdata(max8997->dev);
 		if (IS_ERR(pdata)) {
@@ -208,6 +209,7 @@ static int max8997_i2c_probe(struct i2c_client *i2c,
 			goto err;
 		}
 	}
+#endif
 
 	if (!pdata)
 		goto err;
