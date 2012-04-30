@@ -166,7 +166,7 @@ static int regulator_check_voltage(struct regulator_dev *rdev,
 		return -ENODEV;
 	}
 	if (!(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_VOLTAGE)) {
-		rdev_err(rdev, "operation not allowed\n");
+		rdev_err(rdev, "regulator_check_voltate: operation not allowed\n");
 		return -EPERM;
 	}
 
@@ -223,7 +223,7 @@ static int regulator_check_current_limit(struct regulator_dev *rdev,
 		return -ENODEV;
 	}
 	if (!(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_CURRENT)) {
-		rdev_err(rdev, "operation not allowed\n");
+		rdev_err(rdev, "regulator_check_current_limit: operation not allowed\n");
 		return -EPERM;
 	}
 
@@ -260,7 +260,7 @@ static int regulator_mode_constrain(struct regulator_dev *rdev, int *mode)
 		return -ENODEV;
 	}
 	if (!(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_MODE)) {
-		rdev_err(rdev, "operation not allowed\n");
+		rdev_err(rdev, "regulator_mode_constrain: operation not allowed\n");
 		return -EPERM;
 	}
 
@@ -284,7 +284,7 @@ static int regulator_check_drms(struct regulator_dev *rdev)
 		return -ENODEV;
 	}
 	if (!(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_DRMS)) {
-		rdev_err(rdev, "operation not allowed\n");
+		rdev_err(rdev, "regulator_check_drms: operation not allowed\n");
 		return -EPERM;
 	}
 	return 0;
