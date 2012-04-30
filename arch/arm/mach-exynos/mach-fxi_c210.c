@@ -24,6 +24,8 @@
 #include <linux/rfkill-gpio.h>
 #include <linux/ath6kl.h>
 #include <linux/delay.h>
+#include <linux/gpio_keys.h>
+#include <linux/input.h>
 
 #include <linux/dma-mapping.h>
 #include <linux/memblock.h>
@@ -752,6 +754,32 @@ static struct platform_device fxi_c210_device_bluetooth = {
 	},
 };
 
+
+/* Bluetooth button */
+static struct gpio_keys_button btbutton[] = {
+  [0] = {
+    .desc   = "Bluetooth button",
+    .code   = KEY_RECORD,
+    .type   = EV_KEY,
+    .gpio   = EXYNOS4_GPX3(5),
+    .wakeup = 0,
+  },
+};
+
+static struct gpio_keys_platform_data bt_gpio_keys_data = {
+  .buttons        = btbutton,
+  .nbuttons       = 1,
+};
+ 
+static struct platform_device btbutton_device_gpiokeys = {
+  .name      = "gpio-keys",
+  .id      = -1,
+  .dev = {
+    .platform_data = &bt_gpio_keys_data,
+  },
+};
+
+/* FXI FB */
 static struct resource fxifb_resource[] = {
   [0] = {
     .start = FXIFB_BASE,
@@ -772,6 +800,19 @@ struct platform_device fxifb_device = {
     .coherent_dma_mask  = DMA_BIT_MASK(32),
   },
 };
+
+/* FXI Sysfs */
+
+static struct platform_device fxi_sysfs = {
+  .name = "fxi-sysfs",
+  .id = -1,
+};
+
+/* fxi-fxiid entry */
+static struct platform_device fxi_fxiid = {
+  .name = "fxi-fxiid",
+  .id = -1,
+ }; 
 
 static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_hsmmc2,
@@ -813,6 +854,9 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&exynos4_device_pcm2,
 	&exynos4_device_ac97,
 	&exynos4_device_spdif,
+  &btbutton_device_gpiokeys,
+  &fxi_sysfs,
+  &fxi_fxiid,
 };
 
 /* LCD Backlight data */
