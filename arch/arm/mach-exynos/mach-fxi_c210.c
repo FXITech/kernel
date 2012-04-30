@@ -51,6 +51,7 @@
 #include <plat/fb.h>
 #include <plat/mfc.h>
 #include <plat/udc-hs.h>
+#include <plat/hdmi.h>
 
 #include <mach/ohci.h>
 #include <mach/map.h>
@@ -854,9 +855,9 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&exynos4_device_pcm2,
 	&exynos4_device_ac97,
 	&exynos4_device_spdif,
-  &btbutton_device_gpiokeys,
-  &fxi_sysfs,
-  &fxi_fxiid,
+  	&btbutton_device_gpiokeys,
+  	&fxi_sysfs,
+  	&fxi_fxiid,
 };
 
 /* LCD Backlight data */
@@ -879,6 +880,11 @@ static void __init fxi_c210_bt_setup(void)
 	s3c_gpio_cfgpin(EXYNOS4_GPX2(2), S3C_GPIO_OUTPUT);
 	s3c_gpio_setpull(EXYNOS4_GPX2(2), S3C_GPIO_PULL_NONE);
 }
+
+/* I2C module and id for HDMIPHY */
+static struct i2c_board_info hdmiphy_info = {
+        I2C_BOARD_INFO("hdmiphy", 0x38),
+};
 
 static void s5p_tv_setup(void)
 {
@@ -936,6 +942,7 @@ static void __init fxi_c210_machine_init(void)
 
 	s5p_tv_setup();
 	s5p_i2c_hdmiphy_set_platdata(NULL);
+	s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
 
 //	s5p_fimd0_set_platdata(&fxi_c210_lcd_pdata);
 
