@@ -181,7 +181,7 @@ static struct regulator_init_data max8997_ldo3_data = {
     .max_uV   = 1100000,
     .apply_uV = 1,
     .always_on  = 1,
-    .valid_ops_mask = REGULATOR_CHANGE_STATUS,
+    .valid_ops_mask = REGULATOR_CHANGE_STATUS | REGULATOR_CHANGE_VOLTAGE,
     .state_mem  = {
       .uV   = 1100000,
       .disabled = 1,
@@ -815,6 +815,11 @@ static struct platform_device fxi_fxiid = {
   .id = -1,
  }; 
 
+static struct platform_device fxi_mali = {
+  .name = "mali_drm",
+  .id = -1,
+};
+
 static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_hsmmc2,
 	&s3c_device_hsmmc0,
@@ -858,6 +863,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
   	&btbutton_device_gpiokeys,
   	&fxi_sysfs,
   	&fxi_fxiid,
+    &fxi_mali,
 };
 
 /* LCD Backlight data */

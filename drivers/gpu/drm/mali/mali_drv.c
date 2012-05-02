@@ -105,16 +105,16 @@ int mali_drm_init(struct platform_device *dev)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)
 	return drm_init(&driver);
 #else
-	return drm_pci_init(&driver, &mali_pci_driver);
+	return drm_platform_init(&driver, dev);
 #endif
 }
 
-void mali_drm_exit(void)
+void mali_drm_exit(struct platform_device *dev)
 {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39)
 	drm_exit(&driver);
 #else
-	drm_pci_exit(&driver, &mali_pci_driver);
+	drm_platform_exit(&driver, dev);
 #endif
 }
 
@@ -125,7 +125,7 @@ static int __devinit mali_platform_drm_probe(struct platform_device *dev)
 
 static int mali_platform_drm_remove(struct platform_device *dev)
 {
-	mali_drm_exit();
+	mali_drm_exit(dev);
 
 	return 0;
 }
