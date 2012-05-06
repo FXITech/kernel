@@ -16,7 +16,8 @@
 
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-memops.h>
-
+#include <media/videobuf2-dma-contig.h>
+ 
 struct vb2_dc_conf {
 	struct device		*dev;
 };
