@@ -689,6 +689,7 @@ static struct platform_device fxi_c210_device_gpiokeys = {
 static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
 {
 	int ret;
+<<<<<<< HEAD
 
 	if (power)
 		ret = gpio_request_one(EXYNOS4_GPE3(4),
@@ -703,6 +704,22 @@ static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
 		pr_err("failed to request gpio for LCD power: %d\n", ret);
 }
 
+=======
+
+	if (power)
+		ret = gpio_request_one(EXYNOS4_GPE3(4),
+					GPIOF_OUT_INIT_HIGH, "GPE3_4");
+	else
+		ret = gpio_request_one(EXYNOS4_GPE3(4),
+					GPIOF_OUT_INIT_LOW, "GPE3_4");
+
+	gpio_free(EXYNOS4_GPE3(4));
+
+	if (ret)
+		pr_err("failed to request gpio for LCD power: %d\n", ret);
+}
+
+>>>>>>> parent of a9b1745... Removes dead code from FXI C210 machine file.
 static struct plat_lcd_data fxi_c210_lcd_hv070wsa_data = {
 	.set_power = lcd_hv070wsa_set_power,
 	.min_uV		= 3300000,
@@ -864,6 +881,17 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
   	&fxi_sysfs,
   	&fxi_fxiid,
     &fxi_mali,
+};
+
+/* LCD Backlight data */
+static struct samsung_bl_gpio_info fxi_c210_bl_gpio_info = {
+	.no		= EXYNOS4_GPD0(0),
+	.func		= S3C_GPIO_SFN(2),
+};
+
+static struct platform_pwm_backlight_data fxi_c210_bl_data = {
+	.pwm_id		= 0,
+	.pwm_period_ns	= 1000,
 };
 
 /* LCD Backlight data */

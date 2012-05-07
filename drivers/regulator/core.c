@@ -166,7 +166,7 @@ static int regulator_check_voltage(struct regulator_dev *rdev,
 		return -ENODEV;
 	}
 	if (!(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_VOLTAGE)) {
-		rdev_err(rdev, "regulator_check_voltate: operation not allowed\n");
+		//rdev_err(rdev, "regulator_check_voltate: operation not allowed\n");
 		return -EPERM;
 	}
 
@@ -176,8 +176,8 @@ static int regulator_check_voltage(struct regulator_dev *rdev,
 		*min_uV = rdev->constraints->min_uV;
 
 	if (*min_uV > *max_uV) {
-		rdev_err(rdev, "unsupportable voltage range: %d-%duV\n",
-			 *min_uV, *max_uV);
+		//rdev_err(rdev, "unsupportable voltage range: %d-%duV\n",
+		//	 *min_uV, *max_uV);
 		return -EINVAL;
 	}
 
@@ -1965,6 +1965,7 @@ int regulator_set_voltage(struct regulator *regulator, int min_uV, int max_uV)
 	}
 
 	/* constraints check */
+	//printk(KERN_ALERT "regulator_set_voltage: umin: %d umax: %d\n", min_uV, max_uV);
 	ret = regulator_check_voltage(rdev, &min_uV, &max_uV);
 	if (ret < 0)
 		goto out;
@@ -2059,6 +2060,7 @@ int regulator_sync_voltage(struct regulator *regulator)
 	max_uV = regulator->max_uV;
 
 	/* This should be a paranoia check... */
+	//printk(KERN_ALERT "regulator_sync_voltage: umin: %d umax: %d\n", min_uV, max_uV);
 	ret = regulator_check_voltage(rdev, &min_uV, &max_uV);
 	if (ret < 0)
 		goto out;

@@ -665,8 +665,9 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	info->fbops = &vb2_fb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->screen_base = NULL;
-
+	printk(KERN_DEBUG "fxifb: allocating memory ..\n");
 	fxi_fb_alloc_memory(&vfd->dev, &fxi_fb_default_pdata);
+	printk(KERN_DEBUG "fxifb: allocated memory - smem_start = %lx\n - smem_len = %lx", info->fix.smem_start, info->fix.smem_len);
 
 	ret = register_framebuffer(info);
 	if (ret)

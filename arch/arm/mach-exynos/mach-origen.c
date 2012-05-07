@@ -749,6 +749,13 @@ static struct platform_device origen_device_bluetooth = {
 	},
 };
 
+#ifdef CONFIG_DRM_MALI
+static struct platform_device fxi_c210_device_mali_drm = {
+        .name = "mali_drm",
+        .id   = -1,
+};
+#endif
+
 static struct platform_device *origen_devices[] __initdata = {
 	&s3c_device_hsmmc2,
 	&s3c_device_hsmmc0,
@@ -781,6 +788,7 @@ static struct platform_device *origen_devices[] __initdata = {
 	&origen_lcd_hv070wsa,
 	&origen_leds_gpio,
 	&origen_device_bluetooth,
+	&fxi_c210_device_mali_drm,
 };
 
 /* LCD Backlight data */
