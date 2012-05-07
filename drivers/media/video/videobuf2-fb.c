@@ -25,7 +25,7 @@
 #include <media/v4l2-ioctl.h>
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-fb.h>
-
+#include <linux/fxifb.h>
 #include <../drivers/gpu/arm/ump/include/ump_kernel_interface_ref_drv.h>
 
 #define FXIFB_SIZE (16 << 20) // 22 MB
@@ -39,6 +39,16 @@ module_param(debug, int, 0644);
 		if (debug >= level)					\
 			printk(KERN_DEBUG "vb2: " fmt, ## arg);		\
 	} while (0)
+
+static ump_dd_handle ump_wrapped_buffer;
+
+static struct fxifb_platform_data fxi_fb_default_pdata = {
+	.xres = 1920,
+	.yres = 1080,
+	.virtual_x = 1920,
+	.virtual_y = 1080,
+	.max_bpp = 32,
+};
 
 struct vb2_fb_data {
 	struct video_device *vfd;
@@ -57,7 +67,6 @@ struct vb2_fb_data {
 	struct file fake_file;
 	struct dentry fake_dentry;
 	struct inode fake_inode;
-	ump_dd_handle ump_wrapped_buffer;
 };
 
 static int vb2_fb_stop(struct fb_info *info);
@@ -101,6 +110,57 @@ static struct fmt_desc fmt_conv_table[] = {
 	},
 	/* TODO: add more format descriptors */
 };
+
+/**
+ * fxi_fb_alloc_memory() - allocate display memory for framebuffer window
+ * @sfb: The base resources for the hardware.
+ * @win: The window to initialise memory for.
+ *
+ * Allocate memory for the given framebuffer.
+ */
+static int __devinit fxi_fb_alloc_memory(struct device *dev,
+					 struct fxifb_platform_data *win)
+{
+	struct fxifb_platform_data *windata = win;
+	unsigned int real_size, virt_size, size;
+	struct fb_info *fbi = win->fbinfo;
+	dma_addr_t map_dma;
+	ump_dd_physical_block ump_memory_description;
+	printk(KERN_DEBUG "fxifb: allocating memory for display\n");
+
+	real_size = windata->xres * windata->yres;
+	virt_size = windata->virtual_x * windata->virtual_y;
+
+	printk(KERN_DEBUG "fxifb: real_size=%u (%u.%u), virt_size=%u (%u.%u)\n",
+		real_size, windata->xres, windata->yres,
+		virt_size, windata->virtual_x, windata->virtual_y);
+
+	size = (real_size > virt_size) ? real_size : virt_size;
+	size *= (windata->max_bpp > 16) ? 32 : windata->max_bpp;
+	size /= 8;
+
+	fbi->fix.smem_len = size;
+	size = PAGE_ALIGN(size);
+
+	printk(KERN_DEBUG "fxifb: want %u bytes for window\n", size);
+
+	fbi->screen_base = dma_alloc_writecombine(dev, size, &map_dma, GFP_KERNEL);
+	if (!fbi->screen_base)
+		return -ENOMEM;
+
+	printk(KERN_DEBUG "fxifb: mapped %x to %p\n", (unsigned int)map_dma, fbi->screen_base);
+
+	memset(fbi->screen_base, 0x0, size);
+
+	fbi->fix.smem_start = map_dma;
+
+	/* Setup UMP for Mali */
+    
+	ump_memory_description.addr = fbi->fix.smem_start;
+	ump_memory_description.size = fbi->fix.smem_len;
+	ump_wrapped_buffer = ump_dd_handle_create_from_phys_blocks(&ump_memory_description, 1);
+	return 0;
+}
 
 /**
  * vb2_drv_lock() - a shortcut to call driver specific lock()
@@ -244,7 +304,7 @@ static int vb2_fb_activate(struct fb_info *info)
 	info->screen_size = size;
 	info->fix.line_length = bpl;
 	info->fix.smem_len = info->fix.mmio_len = size;
-	printk(KERN_DEBUG "fxifb: data->vaddr: %x, size = %x", (unsigned int)data->vaddr, size, info->fix.smem_start);
+	printk(KERN_DEBUG "fxifb: data->vaddr: %x, size = %x", (unsigned int)data->vaddr, size);
 	var = &info->var;
 	var->xres = var->xres_virtual = var->width = width;
 	var->yres = var->yres_virtual = var->height = height;
@@ -253,11 +313,6 @@ static int vb2_fb_activate(struct fb_info *info)
 	var->green = conv->green;
 	var->blue = conv->blue;
 	var->transp = conv->transp;
-
-	ump_dd_physical_block ump_memory_description;
-	ump_memory_description.addr = (unsigned long) info->screen_base;
-	ump_memory_description.size = size;
-	data->ump_wrapped_buffer = ump_dd_handle_create_from_phys_blocks(&ump_memory_description, 1);
 	return 0;
 
 err:
@@ -521,7 +576,6 @@ static int fxifb_wait_for_vsync(struct fb_info *info, u32 crtc)
 static int fxifb_ioctl(struct fb_info *info, unsigned int cmd,
 		       unsigned long arg)
 {
-	struct vb2_fb_data *data = info->par;
 	u32 crtc;
 	int ret = 0;
 		
@@ -533,7 +587,7 @@ static int fxifb_ioctl(struct fb_info *info, unsigned int cmd,
 		u32 __user *psecureid = (u32 __user *) arg;
 		ump_secure_id secure_id;
 
-		secure_id = ump_dd_secure_id_get(data->ump_wrapped_buffer);
+		secure_id = ump_dd_secure_id_get(ump_wrapped_buffer);
 		printk(KERN_DEBUG "fxifb: Secure_ID: %x", secure_id);
 		ret = put_user((unsigned int)secure_id, psecureid);
 		break;
@@ -586,6 +640,7 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	struct fb_info *info;
 	int ret;
 
+	info = fxi_fb_default_pdata.fbinfo;
 
 	BUG_ON(q->type != V4L2_BUF_TYPE_VIDEO_OUTPUT &&
 	     q->type != V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE);
@@ -601,18 +656,6 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 		return ERR_PTR(-ENOMEM);
 
 	data = info->par;
-
-	/* Allocate DMA buffer */
-	
-	data->alloc_ctx = vb2_dma_contig_init_ctx(data->dev);
-/*	data->dma_addr = vb2_dma_contig_alloc(&data->alloc_ctx, FXIFB_SIZE);
-	if(data->dma_addr == -ENOMEM){
-		printk(KERN_DEBUG "fxifb: Unable to allocate DMA buffer\n");
-		return ERR_PTR(-ENOMEM);
-	}*/
-	printk(KERN_DEBUG "fxifb: fb_register data->alloc_ctx: %x", data->alloc_ctx);
-
-
 	
 	info->fix.type	= FB_TYPE_PACKED_PIXELS;
 	info->fix.accel	= FB_ACCEL_NONE;
@@ -622,6 +665,8 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	info->fbops = &vb2_fb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->screen_base = NULL;
+
+	fxi_fb_alloc_memory(&vfd->dev, &fxi_fb_default_pdata);
 
 	ret = register_framebuffer(info);
 	if (ret)
@@ -650,7 +695,6 @@ int vb2_fb_unregister(void *fb_emu)
 	struct fb_info *info = fb_emu;
 	struct vb2_fb_data *data = info->par;
 	struct module *owner = data->vfd->fops->owner;
-	vb2_dma_contig_cleanup_ctx(data->alloc_ctx);
 	unregister_framebuffer(info);
 	module_put(owner);
 	return 0;
