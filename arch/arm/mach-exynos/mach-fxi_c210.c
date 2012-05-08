@@ -894,16 +894,6 @@ static struct platform_pwm_backlight_data fxi_c210_bl_data = {
 	.pwm_period_ns	= 1000,
 };
 
-/* LCD Backlight data */
-static struct samsung_bl_gpio_info fxi_c210_bl_gpio_info = {
-	.no		= EXYNOS4_GPD0(0),
-	.func		= S3C_GPIO_SFN(2),
-};
-
-static struct platform_pwm_backlight_data fxi_c210_bl_data = {
-	.pwm_id		= 0,
-	.pwm_period_ns	= 1000,
-};
 
 static void __init fxi_c210_bt_setup(void)
 {
