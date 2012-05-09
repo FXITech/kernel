@@ -124,10 +124,12 @@ static struct regulator_consumer_supply ldo3_consumer[] = {
   REGULATOR_SUPPLY("hdmi-en", "exynos4-hdmi"), /* HDMI */
   REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"), /* HDMI */
   REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"), /* MIPI */
-  REGULATOR_SUPPLY("vmmc", NULL), /* sdhc-drivers want it, this is always on so we just hook it up */
 };
 static struct regulator_consumer_supply ldo4_consumer[] = {
   REGULATOR_SUPPLY("vdd18", "s5p-mipi-csis.0"), /* MIPI */
+};
+static struct regulator_consumer_supply ldo8_consumer[] = {
+  REGULATOR_SUPPLY("vmmc", NULL), /* sdhc-drivers want it, this is always on so we just hook it up to someting with 3.3V */  
 };
 
 static struct regulator_consumer_supply buck1_consumer[] = {

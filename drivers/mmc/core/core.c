@@ -1007,8 +1007,8 @@ int mmc_regulator_set_ocr(struct mmc_host *mmc,
 	}
 
 	if (result)
-		//dev_err(mmc_dev(mmc),
-		//	"could not set regulator OCR (%d)\n", result);
+		dev_err(mmc_dev(mmc),
+			"could not set regulator OCR (%d)\n", result);
 	return result;
 }
 EXPORT_SYMBOL(mmc_regulator_set_ocr);

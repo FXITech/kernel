@@ -166,7 +166,7 @@ static int regulator_check_voltage(struct regulator_dev *rdev,
 		return -ENODEV;
 	}
 	if (!(rdev->constraints->valid_ops_mask & REGULATOR_CHANGE_VOLTAGE)) {
-		//rdev_err(rdev, "regulator_check_voltate: operation not allowed\n");
+		rdev_err(rdev, "regulator_check_voltage: operation not allowed\n");
 		return -EPERM;
 	}
 
