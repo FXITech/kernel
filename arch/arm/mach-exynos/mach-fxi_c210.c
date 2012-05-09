@@ -268,6 +268,8 @@ static struct regulator_init_data max8997_ldo8_data = {
       .enabled = 1,
     },
   },
+  .num_consumer_supplies = ARRAY_SIZE(ldo8_consumer),
+  .consumer_supplies = ldo8_consumer,
 };
 
 static struct regulator_init_data max8997_ldo9_data = {
