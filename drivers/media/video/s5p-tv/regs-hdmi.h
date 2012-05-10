@@ -84,6 +84,7 @@
 #define HDMI_ASP_CHCFG3			HDMI_CORE_BASE(0x031C)
 #define HDMI_AUI_CON			HDMI_CORE_BASE(0x0360)
 
+/* old definitions, from head:
 #define HDMI_ACR_CON			HDMI_CORE_BASE(0x0400)
 #define HDMI_ACR_MCTS0			HDMI_CORE_BASE(0x0410)
 #define HDMI_ACR_MCTS1			HDMI_CORE_BASE(0x0414)
@@ -94,6 +95,20 @@
 #define HDMI_ACR_N0			HDMI_CORE_BASE(0x0430)
 #define HDMI_ACR_N1			HDMI_CORE_BASE(0x0434)
 #define HDMI_ACR_N2			HDMI_CORE_BASE(0x0438)
+*/
+
+#define HDMI_ACR_CON			HDMI_CORE_BASE(0x0180)
+#define HDMI_ACR_MCTS0			HDMI_CORE_BASE(0x0184)
+#define HDMI_ACR_MCTS1			HDMI_CORE_BASE(0x0188)
+#define HDMI_ACR_MCTS2			HDMI_CORE_BASE(0x018C)
+#define HDMI_ACR_CTS0			HDMI_CORE_BASE(0x0190)
+#define HDMI_ACR_CTS1			HDMI_CORE_BASE(0x0194)
+#define HDMI_ACR_CTS2			HDMI_CORE_BASE(0x0198)
+#define HDMI_ACR_N0			HDMI_CORE_BASE(0x01A0)
+#define HDMI_ACR_N1			HDMI_CORE_BASE(0x01A4)
+#define HDMI_ACR_N2			HDMI_CORE_BASE(0x01A8)
+
+#define HDMI_AUI_CON			HDMI_CORE_BASE(0x0360)
 
 /* Timing generator registers */
 #define HDMI_TG_CMD			HDMI_TG_BASE(0x0000)
@@ -229,6 +244,7 @@
 /* I2S_PIN_SEL_2 */
 #define HDMI_I2S_SEL_SDATA3(x)		(((x) & 0x7) << 4)
 #define HDMI_I2S_SEL_SDATA2(x)		((x) & 0x7)
+#define HDMI_I2S_SEL_SDATA4(x)		((x) & 0x7)
 
 /* I2S_PIN_SEL_3 */
 #define HDMI_I2S_SEL_DSD(x)		((x) & 0x7)
@@ -293,6 +309,7 @@
 #define HDMI_I2S_SMP_FREQ_48		(0x2)
 #define HDMI_I2S_SMP_FREQ_32		(0x3)
 #define HDMI_I2S_SMP_FREQ_96		(0xA)
+
 #define HDMI_I2S_SET_SMP_FREQ(x)	((x) & (0xF))
 
 /* I2S_CH_ST_4 / I2S_CH_ST_SH_4 */

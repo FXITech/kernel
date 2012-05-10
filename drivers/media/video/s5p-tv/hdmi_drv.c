@@ -253,10 +253,7 @@ static void hdmi_reg_acr(struct hdmi_device *hdev, u8 *acr)
 	hdmi_writeb(hdev, HDMI_ACR_CTS1, acr[2]);
 	hdmi_writeb(hdev, HDMI_ACR_CTS2, acr[1]);
 
-//	if (hdata->is_v13)
-//		hdmi_writeb(hdev, HDMI_V13_ACR_CON, 4);
-//	else
-		hdmi_writeb(hdev, HDMI_ACR_CON, 4);
+	hdmi_writeb(hdev, HDMI_ACR_CON, 4);
 }
 
 static void hdmi_audio_init(struct hdmi_device *hdev)
@@ -311,7 +308,7 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	/* Configuration I2S input ports. Configure I2S_PIN_SEL_0~4 */
 	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_0, HDMI_I2S_SEL_SCLK(5)
 			| HDMI_I2S_SEL_LRCK(6));
-	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(1)
+	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(3)
 			| HDMI_I2S_SEL_SDATA2(4));
 	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_2, HDMI_I2S_SEL_SDATA3(1)
 			| HDMI_I2S_SEL_SDATA2(2));
@@ -348,11 +345,11 @@ static void hdmi_audio_control(struct hdmi_device *hdev, bool onoff)
 	u32 mod;
 
 	mod = hdmi_read(hdev, HDMI_MODE_SEL);
-	if (mod & HDMI_DVI_MODE_EN)
+	if (mod & HDMI_MODE_DVI_EN)
 		return;
 
 	hdmi_writeb(hdev, HDMI_AUI_CON, onoff ? 2 : 0);
-	hdmi_write_mask(hdev, HDMI_CON_0, onoff ?
+	hdmi_write_mask(hdev, HDMI_CON_0, onoff ? \
 			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
 }
 
@@ -361,11 +358,9 @@ static void hdmi_reg_init(struct hdmi_device *hdev)
 	/* enable HPD interrupts */
 	hdmi_write_mask(hdev, HDMI_INTC_CON, ~0, HDMI_INTC_EN_GLOBAL |
 		HDMI_INTC_EN_HPD_PLUG | HDMI_INTC_EN_HPD_UNPLUG);
-	/* choose DVI mode */
+	/* choose HDMI mode */
 	hdmi_write_mask(hdev, HDMI_MODE_SEL,
-		HDMI_MODE_DVI_EN, HDMI_MODE_MASK);
-	hdmi_write_mask(hdev, HDMI_CON_2, ~0,
-		HDMI_DVI_PERAMBLE_EN | HDMI_DVI_BAND_EN);
+		HDMI_MODE_HDMI_EN, HDMI_MODE_MASK);
 	/* disable bluescreen */
 	hdmi_write_mask(hdev, HDMI_CON_0, 0, HDMI_BLUE_SCR_EN);
 	/* choose bluescreen (fecal) color */
@@ -467,9 +462,11 @@ static int hdmi_conf_apply(struct hdmi_device *hdmi_dev)
 	mdelay(10);
 
 	hdmi_reg_init(hdmi_dev);
+	hdmi_audio_init(hdmi_dev);
 
 	/* setting core registers */
 	hdmi_timing_apply(hdmi_dev, conf);
+	hdmi_audio_control(hdmi_dev, true);
 
 	return 0;
 }
