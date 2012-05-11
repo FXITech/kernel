@@ -53,6 +53,8 @@ g_webcam-y			:= webcam.o
 g_ncm-y				:= ncm.o
 g_acm_ms-y			:= acm_ms.o
 g_android-y			:= android.o
+g_fxi_mass_storage-y		:= fxi_mass_storage.o
+g_fxi_char_dev-y		:= fxi_char_dev.o
 
 obj-$(CONFIG_USB_ZERO)		+= g_zero.o
 obj-$(CONFIG_USB_AUDIO)		+= g_audio.o
@@ -61,6 +63,8 @@ obj-$(CONFIG_USB_GADGETFS)	+= gadgetfs.o
 obj-$(CONFIG_USB_FUNCTIONFS)	+= g_ffs.o
 obj-$(CONFIG_USB_FILE_STORAGE)	+= g_file_storage.o
 obj-$(CONFIG_USB_MASS_STORAGE)	+= g_mass_storage.o
+obj-$(CONFIG_USB_FXI_CHAR_DEV)	+= g_fxi_char_dev.o
+obj-$(CONFIG_USB_FXI_MASS_STORAGE) += g_fxi_mass_storage.o
 obj-$(CONFIG_USB_G_SERIAL)	+= g_serial.o
 obj-$(CONFIG_USB_G_PRINTER)	+= g_printer.o
 obj-$(CONFIG_USB_MIDI_GADGET)	+= g_midi.o

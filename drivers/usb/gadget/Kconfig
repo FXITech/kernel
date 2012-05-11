@@ -536,6 +536,14 @@ config USB_GADGET_SUPERSPEED
 	bool
 	depends on USB_GADGET_DUALSPEED
 
+config USB_FXI_CHAR_DEV
+	tristate "FXI Char device"
+	help
+          FXI char device
+
+          Say "y" to link the driver statically, or "m" to build a
+          dynamically linked module called "fxichardev".
+
 #
 # USB Gadget Drivers
 #
@@ -797,6 +805,12 @@ config USB_MASS_STORAGE
 
 	  Say "y" to link the driver statically, or "m" to build
 	  a dynamically linked module called "g_mass_storage".
+
+config USB_FXI_MASS_STORAGE
+        tristate "USB gadget FXI Mass Storage function"
+	depends on BLOCK
+        help
+          Provides FXI USB mass storage function for android gadget driver.
 
 config USB_G_SERIAL
 	tristate "Serial Gadget (with CDC ACM and CDC OBEX support)"
