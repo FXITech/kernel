@@ -198,38 +198,38 @@ static void hdmi_set_acr(u32 freq, u8 *acr)
 	u32 n, cts;
 
 	switch (freq) {
-		case 32000:
-			n = 4096;
-			cts = 27000;
-			break;
-		case 44100:
-			n = 6272;
-			cts = 30000;
-			break;
-		case 88200:
-			n = 12544;
-			cts = 30000;
-			break;
-		case 176400:
-			n = 25088;
-			cts = 30000;
-			break;
-		case 48000:
-			n = 6144;
-			cts = 27000;
-			break;
-		case 96000:
-			n = 12288;
-			cts = 27000;
-			break;
-		case 192000:
-			n = 24576;
-			cts = 27000;
-			break;
-		default:
-			n = 0;
-			cts = 0;
-			break;
+	case 32000:
+		n = 4096;
+		cts = 27000;
+		break;
+	case 44100:
+		n = 6272;
+		cts = 30000;
+		break;
+	case 88200:
+		n = 12544;
+		cts = 30000;
+		break;
+	case 176400:
+		n = 25088;
+		cts = 30000;
+		break;
+	case 48000:
+		n = 6144;
+		cts = 27000;
+		break;
+	case 96000:
+		n = 12288;
+		cts = 27000;
+		break;
+	case 192000:
+		n = 24576;
+		cts = 27000;
+		break;
+	default:
+		n = 0;
+		cts = 0;
+		break;
 	}
 
 	acr[1] = cts >> 16;
@@ -268,18 +268,18 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	frame_size_code = 0;
 
 	switch (bits_per_sample) {
-		case 20:
-			data_num = 2;
-			bit_ch  = 1;
-			break;
-		case 24:
-			data_num = 3;
-			bit_ch  = 1;
-			break;
-		default:
-			data_num = 1;
-			bit_ch  = 0;
-			break;
+	case 20:
+		data_num = 2;
+		bit_ch = 1;
+		break;
+	case 24:
+		data_num = 3;
+		bit_ch = 1;
+		break;
+	default:
+		data_num = 1;
+		bit_ch = 0;
+		break;
 	}
 
 	hdmi_set_acr(sample_rate, acr);
@@ -802,7 +802,6 @@ static void hdmi_resource_poweron(struct hdmi_resources *res)
 	clk_set_parent(res->sclk_hdmi, res->sclk_pixel);
 	/* turn clocks on */
 	clk_enable(res->sclk_hdmi);
-
 }
 
 static void hdmi_resource_poweroff(struct hdmi_resources *res)
@@ -927,9 +926,6 @@ static int hdmi_runtime_resume(struct device *dev)
 	ret = v4l2_subdev_call(hdev->mhl_sd, core, s_power, 1);
 	if (hdev->mhl_sd && ret)
 		goto fail;
-
-	hdmi_audio_init(hdev);
-	hdmi_audio_control(hdev, true);
 
 	dev_dbg(dev, "poweron succeed\n");
 

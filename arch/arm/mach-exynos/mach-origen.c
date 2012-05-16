@@ -512,6 +512,7 @@ static struct s3c_sdhci_platdata origen_hsmmc3_pdata __initdata = {
 	.max_width		= 4,
 	.host_caps		= MMC_CAP_4_BIT_DATA |
 			MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+	.pm_caps		= MMC_PM_KEEP_POWER,
 	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
 	.ext_cd_init		= origen_wifi_status_register,
 };
@@ -524,6 +525,7 @@ static void (*wifi_status_cb)(struct platform_device *, int state);
 static int origen_wifi_status_register(void (*notify_func)
 		(struct platform_device *, int state))
 {
+	/* Assign sdhci_s3c_notify_change to wifi_status_cb */
 	if (!notify_func)
 		return -EAGAIN;
 	else
@@ -569,8 +571,11 @@ static void origen_wlan_setup_power(bool val)
  */
 static int origen_wifi_set_detect(bool val)
 {
+
 	if (!wifi_status_cb) {
-		printk(KERN_WARNING "WLAN: Nobody to notify\n");
+		pr_warning("ORIGEN: WLAN: No callback \n"
+		"ORIGEN: WLAN: MMC should boot earlier than net \n");
+
 		return -EAGAIN;
 	}
 	if (true == val) {
@@ -707,12 +712,30 @@ static struct platform_device origen_lcd_hv070wsa = {
 };
 
 static struct s3c_fb_pd_win origen_fb_win0 = {
-	.xres			= 1024,
-	.yres			= 600,
-	.max_bpp		= 32,
-	.default_bpp		= 24,
-	.virtual_x		= 1024,
-	.virtual_y		= 2 * 600,
+	.xres		= 1024,
+	.yres		= 600,
+	.max_bpp	= 32,
+	.default_bpp	= 32,
+	.virtual_x	= 1024,
+	.virtual_y	= 2 * 600,
+};
+
+static struct s3c_fb_pd_win origen_fb_win1 = {
+	.xres		= 1024,
+	.yres		= 600,
+	.max_bpp	= 32,
+	.default_bpp	= 32,
+	.virtual_x	= 1024,
+	.virtual_y	= 2 * 600,
+};
+
+static struct s3c_fb_pd_win origen_fb_win2 = {
+	.xres		= 1024,
+	.yres		= 600,
+	.max_bpp	= 32,
+	.default_bpp	= 32,
+	.virtual_x	= 1024,
+	.virtual_y	= 2 * 600,
 };
 
 static struct fb_videomode origen_lcd_timing = {
@@ -728,6 +751,8 @@ static struct fb_videomode origen_lcd_timing = {
 
 static struct s3c_fb_platdata origen_lcd_pdata __initdata = {
 	.win[0]		= &origen_fb_win0,
+	.win[1]		= &origen_fb_win1,
+	.win[2]		= &origen_fb_win2,
 	.vtiming	= &origen_lcd_timing,
 	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
 	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
@@ -845,7 +870,7 @@ static void __init origen_power_init(void)
 
 static void __init origen_reserve(void)
 {
-	s5p_mfc_reserve_mem(0x43000000, 8 << 20, 0x51000000, 8 << 20);
+	s5p_mfc_reserve_mem(0x43000000, 32 << 20, 0x51000000, 32 << 20);
 }
 
 static void __init origen_machine_init(void)
