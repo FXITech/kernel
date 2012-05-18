@@ -202,6 +202,9 @@ config SND_SOC_CS4271
 config SND_SOC_CX20442
 	tristate
 
+config SND_SOC_I2S_STUB
+	tristate
+
 config SND_SOC_JZ4740_CODEC
 	tristate
 
