@@ -37,17 +37,17 @@ static ssize_t	get_mac_bt(struct device *dev, struct device_attribute *attr, cha
 static ssize_t	get_revision(struct device *dev, struct device_attribute *attr, char *buf);
 static ssize_t	get_eeprom(struct device *dev, struct device_attribute *attr, char *buf);
 
-static int 	  	w1_rst_presence(void);
-static int    	read_factory(void);
+static int 	  	fxi_w1_rst_presence(void);
+static int    	fxi_w1_read_factory(void);
 static void   	fxi_w1_write_bit(u32 pin, u8 bit);
 static u8 		fxi_w1_read_bit(u32 pin);
 static void 	fxi_w1_write_byte(u32 pin, u8 data);
 static u8 		fxi_w1_read_byte(u32 pin);
-static int 		write_8(u8 *buf, u8 off);
-static ssize_t read_protect1(struct device *dev, struct device_attribute *attr, char *buf);
-static ssize_t write_protect1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
-static ssize_t 		write_page1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
-static ssize_t 		read_page1(struct device *dev, struct device_attribute *attr, char *buf);
+static int 		fxi_w1_write_8(u8 *buf, u8 off);
+static ssize_t fxi_w1_read_protect1(struct device *dev, struct device_attribute *attr, char *buf);
+static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute *attr, char *buf, size_t count);
+static ssize_t 		fxi_w1_write_page1(struct device *dev, struct device_attribute *attr, char *buf, size_t count);
+static ssize_t 		fxi_w1_read_page1(struct device *dev, struct device_attribute *attr, char *buf);
 
 static 	int 	__init fxi_fxiid_init(void);
 static 	void 	__exit fxi_fxiid_exit(void);
@@ -59,33 +59,17 @@ static	DEVICE_ATTR(uuid,				S_IRUGO,		get_uuid,		NULL);
 static	DEVICE_ATTR(romid,				S_IRUGO,		get_romid,		NULL);
 static	DEVICE_ATTR(revision,			S_IRUGO,		get_revision,	NULL);
 static	DEVICE_ATTR(eeprom,				S_IRUGO,		get_eeprom,		NULL);
-static  DEVICE_ATTR(page1,				S_IRWXUGO,		read_page1,	  write_page1);
-static	DEVICE_ATTR(wp1,				S_IRWXUGO,		read_protect1,		write_protect1);
+static  DEVICE_ATTR(page1,				S_IRWXUGO,		fxi_w1_read_page1,	  fxi_w1_write_page1);
+static	DEVICE_ATTR(wp1,				S_IRWXUGO,		fxi_w1_read_protect1,		fxi_w1_write_protect1);
 
 static u8 uuid[16];
 static u8 mac_wifi[6];
 static u8 mac_bt[6];
 static u8 romid[8];
 static u8 revision[4];
-static u8 eeprom[128];
+static u8 eeprom[136];
 static u8 page1[32];
-
-#if 0
-/*
-test content:
-de:ad:c0:de:c0:fe:ba:be:ad:be:24:67:88:ba:ee:e6
-00:21:29:A5:84:55
-00:12:34:56:78:99 */
-
-static u8 testcontent[128]={ 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
-							 0x00, 0x01, 0x02, 0x03, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10};
-#endif
+static u8 wp;
 
 static struct platform_driver fxi_fxiid_driver = {
 	.driver = {
@@ -178,120 +162,7 @@ static u8 fxi_w1_read_byte(u32 pin)
 	return result;
 }
 
-
-static ssize_t read_protect1(struct device *dev, struct device_attribute *attr, char *buf){
-	u8 temp[8];
-	u8 i;
-
-	if(w1_rst_presence()){
-		printk(KERN_DEBUG "fxiid: rst failed in read_protect1");
-		return -1;
-	}
-
-	fxi_w1_write_byte(PIN, READ_MEMORY);
-	fxi_w1_write_byte(PIN, 0x80);
-	fxi_w1_write_byte(PIN, 0x00);
-	for (i = 0; i < 8; i++)
-		temp[i] = fxi_w1_read_byte(PIN);
-	temp[0] = 0x55;
-
-
-	return sprintf(buf, "%02x\n", temp[0]);
-}
-
-static ssize_t write_protect1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
-	u8 temp[8];
-	u8 scratch[8];
-	u8 status;
-	u8 i;
-	u8 check_pre[2];
-	u8 es;
-	u8 ta1;
-	u8 ta2;
-	if(w1_rst_presence()){
-		printk(KERN_DEBUG "fxiid: rst failed in write_protect1");
-		return -1;
-	}
-
-	fxi_w1_write_byte(PIN, READ_MEMORY);
-	fxi_w1_write_byte(PIN, 0x80);
-	fxi_w1_write_byte(PIN, 0x00);
-	for (i = 0; i < 8; i++)
-		temp[i] = fxi_w1_read_byte(PIN);
-	temp[0] = 0x55;
-
-	for(i=0;i<8;i++)
-		printk(KERN_DEBUG "temp = %x\n", temp[i]);
-
-	if(w1_rst_presence()){
-		printk(KERN_DEBUG "fxiid: write_block rst failed\n");
-		return -1;
-	}
-
-	fxi_w1_write_byte(PIN, SKIP_ROM);
-	
-	fxi_w1_write_byte(PIN, WRITE_SCRATCH);
-	fxi_w1_write_byte(PIN, 0x80);
-	fxi_w1_write_byte(PIN, 0x00);
-
-	for(i=0; i<8;i++){
-		fxi_w1_write_byte(PIN, temp[i]);
-		}
-
-	check_pre[0] = fxi_w1_read_byte(PIN);
-	check_pre[1] = fxi_w1_read_byte(PIN);
-
-	printk(KERN_DEBUG "fxiid: pre: crc bytes: %x and %x\n", check_pre[0], check_pre[1]);
-	
-
-	if(w1_rst_presence()){
-		printk(KERN_DEBUG "fxiid: write_block rst failed 2\n");
-		return -1;
-	}
-
-
-	fxi_w1_write_byte(PIN, SKIP_ROM);
-	fxi_w1_write_byte(PIN, READ_SCRATCH);
-
-	ta1 = fxi_w1_read_byte(PIN);
-	ta2 = fxi_w1_read_byte(PIN);
-	es = fxi_w1_read_byte(PIN);
-	printk(KERN_DEBUG "fxiid: ta1 : %x ta2 : %x es : %x", ta1, ta2, es);
-
-	for(i=0; i<10;i++){
-		scratch[i] = fxi_w1_read_byte(PIN);
-	}
-	
-	if(w1_rst_presence()){
-		printk(KERN_DEBUG "fxiid: write_block rst failed 3\n");
-		return -1;
-	}
-
-
-	fxi_w1_write_byte(PIN, SKIP_ROM);
-	fxi_w1_write_byte(PIN, COPY_SCRATCH); 
-	fxi_w1_write_byte(PIN, ta1); 
-	fxi_w1_write_byte(PIN, ta2); 
-	fxi_w1_write_byte(PIN, es);
-
-	msleep(11);
-
-	status = fxi_w1_read_byte(PIN);
-	printk(KERN_DEBUG "fxiid: Status %x", status);
-	if(status!= 0xAA){
-		printk(KERN_DEBUG "fxiid: write_protect1 failed (success != 0xAA)");
-		return -1;
-		}
-
-	if(w1_rst_presence()){
-		printk(KERN_DEBUG "fxiid: write_block rst failed 4\n");
-		return -1;
-	}
-	return 0;
-}
-
-
-static int w1_rst_presence()
+static int fxi_w1_rst_presence()
 {
 	u8 firstbyte;
 
@@ -305,19 +176,48 @@ static int w1_rst_presence()
 
 	if (firstbyte){
 		printk(KERN_DEBUG "fxiid: reset-presence failed");
-		return -1;
+		return 1;
 	}
 
 	return 0;
 }
 
-static ssize_t read_page1(struct device *dev, struct device_attribute *attr, char *buf){
+
+static ssize_t fxi_w1_read_protect1(struct device *dev, struct device_attribute *attr, char *buf){
+
+	return sprintf(buf, "%02x\n", wp);
+}
+
+static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute *attr, char *buf, size_t count){
+
+	u8 tempwp[8];
+	int i;
+
+	fxi_w1_write_byte(PIN, READ_MEMORY);
+	fxi_w1_write_byte(PIN, 0x80);
+	fxi_w1_write_byte(PIN, 0x00);
+
+	for(i=0; i<8; i++){
+		tempwp[i] = fxi_w1_read_byte(PIN);
+		printk(KERN_DEBUG "fxiid: write_protect1: tempwp[%d] = %x", i, tempwp[i]);
+	}
+
+	if(tempwp[0] != 0x55)
+		tempwp[0] = 0x55;
+
+	if(fxi_w1_write_8(&tempwp[0], 0x80))
+			return sprintf(buf, "wrote write protection byte\n");
+
+	return sprintf(buf, "unable to write protection byte\n");
+}
+
+static ssize_t fxi_w1_read_page1(struct device *dev, struct device_attribute *attr, char *buf){
 
 	memcpy(buf, page1, 32);
 	return 32;
 }
 
-static ssize_t write_page1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
+static ssize_t fxi_w1_write_page1(struct device *dev, struct device_attribute *attr, char *buf, size_t count){
 	unsigned int i;
 	u8 alignment=0;
 	char temp[32];
@@ -329,7 +229,7 @@ static ssize_t write_page1(struct device *dev, struct device_attribute *attr, co
 	for(i=0; i<4;i++){
 retry:
 		printk(KERN_DEBUG "fxiid: alignment: %x", alignment);
-		if(write_8(&temp[alignment], alignment)){
+		if(fxi_w1_write_8(&temp[alignment], alignment)){
 			if(retries<10){
 				msleep(1);
 				retries++;
@@ -340,33 +240,9 @@ retry:
 		}
 		alignment+=8;
 	}
-	read_factory(); // Re-read to refresh globals.
+	fxi_w1_read_factory(); // Re-read to refresh globals.
 	return count;
 }
-
-#if 0
-static int write_testcontent(u8 *buf){
-	int i;
-	u8 alignment=0;
-	char temp[128];
-
-
-	memcpy(temp, buf, 128);
-
-	printk(KERN_DEBUG "Writing testcontent...");
-
-	for(i=0; i<16; i++){
-		if(write_8(&temp[alignment], alignment)){
-			printk(KERN_DEBUG "Unable to write bytes.");
-			return -1;
-		}
-		alignment+=8;
-	printk(KERN_DEBUG "Wrote 8 bytes starting at testcontent[%d]", alignment);
-	}
-	printk(KERN_DEBUG "Wrote testcontent...");
-	return 0;
-}
-#endif
 
 /*
  Write a block of 8 bytes. 
@@ -375,10 +251,10 @@ static int write_testcontent(u8 *buf){
 */
 
 
-static int write_8(u8 *buf, u8 off)
+static int fxi_w1_write_8(u8 *buf, u8 off)
 {
 	int i;
-	u8 scratch[10];
+//	u8 scratch[10];
 	u8 status;
 	u8 check_pre[2];
 	u8 es;
@@ -388,7 +264,7 @@ static int write_8(u8 *buf, u8 off)
 	tries = 1;
 retry:
 
-	if(w1_rst_presence()){
+	if(fxi_w1_rst_presence()){
 		printk(KERN_DEBUG "fxiid: write_block rst failed\n");
 		return -1;
 	}
@@ -409,9 +285,9 @@ retry:
 	printk(KERN_DEBUG "fxiid: pre: crc bytes: %x and %x\n", check_pre[0], check_pre[1]);
 	
 
-	if(w1_rst_presence()){
+	if(fxi_w1_rst_presence()){
 		printk(KERN_DEBUG "fxiid: write_block rst failed 2\n");
-		return -1;
+		return 1;
 	}
 
 
@@ -423,11 +299,7 @@ retry:
 	es = fxi_w1_read_byte(PIN);
 	printk(KERN_DEBUG "fxiid: ta1 : %x ta2 : %x es : %x", ta1, ta2, es);
 
-	for(i=0; i<10;i++){
-		scratch[i] = fxi_w1_read_byte(PIN);
-	}
-	
-	if(w1_rst_presence()){
+	if(fxi_w1_rst_presence()){
 		printk(KERN_DEBUG "fxiid: write_block rst failed 3\n");
 		return -1;
 	}
@@ -439,7 +311,7 @@ retry:
 	fxi_w1_write_byte(PIN, ta2); 
 	fxi_w1_write_byte(PIN, es);
 
-	msleep(11);
+	msleep(13);
 
 	status = fxi_w1_read_byte(PIN);
 	printk(KERN_DEBUG "fxiid: Status %x", status);
@@ -453,26 +325,27 @@ retry:
 		return -1;
 	}
 
-	if(w1_rst_presence()){
+	if(fxi_w1_rst_presence()){
 		printk(KERN_DEBUG "fxiid: write_block rst failed 4\n");
 		return -1;
 	}
 
 printk(KERN_DEBUG "fxiid:Successfully wrote block!\n");
-return w1_rst_presence();
+return fxi_w1_rst_presence();
 }
 
 
-static int read_factory()
+static int fxi_w1_read_factory()
 {
 
 		u8 i;
+		int eeprom_empty;
 
 		printk(KERN_DEBUG "fxiid: in read_factory");
 
 
 
-	if(w1_rst_presence()){
+	if(fxi_w1_rst_presence()){
 		printk(KERN_DEBUG "fxiid: reset-presence in EEPROM failed. Setting mem to 0xFF");
 		memset(eeprom, 0xFF, 32);
 		goto exit_eeread;
@@ -488,10 +361,11 @@ static int read_factory()
 	fxi_w1_write_byte(PIN, READ_MEMORY);
 	fxi_w1_write_byte(PIN, 0x00);
 	fxi_w1_write_byte(PIN, 0x00);
-	for (i = 0; i < 128; i++)
+	for (i = 0; i < 136; i++)
 		eeprom[i] = fxi_w1_read_byte(PIN);
 
-
+	wp=eeprom[128];
+	printk(KERN_DEBUG "fxiid: Write Protect byte: %x", wp);
 
 exit_eeread:
 
@@ -502,7 +376,7 @@ exit_eeread:
 	memcpy(revision, page1+28, 4);
 #if 1
 /* Temporary, this code should be removed after moving from gingerbread */
-int eeprom_empty = 1;
+eeprom_empty = 1;
 for (i=0; i < 6; i++) {
 	if (mac_wifi[i] != 0) {
 		eeprom_empty = 0;
@@ -626,7 +500,7 @@ static int __init fxi_fxiid_init(void)
 	s3c_gpio_setpull(PIN, S3C_GPIO_PULL_UP);
 
 	//write_testcontent(&testcontent[0]);
-	read_factory();
+	fxi_w1_read_factory();
     err = platform_driver_register(&fxi_fxiid_driver);
     return err;
 }
