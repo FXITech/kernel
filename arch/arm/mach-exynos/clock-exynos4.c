@@ -121,7 +121,27 @@ static struct clk dummy_apb_pclk = {
 };
 
 static struct clk exynos4_clk_xxti = {
-	.name		= "xxti",
+    .name   = "xxti",
+};
+
+static struct clk exynos4_clk_audiocdclk0 = {
+    .name   = "audiocdclk",
+    .id = 0,
+};
+
+static struct clk exynos4_clk_audiocdclk1 = {
+    .name   = "audiocdclk",
+    .id = 0,
+};
+
+static struct clk exynos4_clk_audiocdclk2 = {
+    .name   = "audiocdclk",
+    .id = -1,
+};
+
+static struct clk exynos4_clk_spdifcdclk = {
+    .name   = "spdifcdclk",
+    .id = -1,
 };
 
 static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
@@ -216,7 +236,17 @@ static int exynos4_clk_hdmiphy_ctrl(struct clk *clk, int enable)
 
 static int exynos4_clk_dac_ctrl(struct clk *clk, int enable)
 {
-	return s5p_gatectrl(S5P_DAC_PHY_CONTROL, clk, enable);
+    return s5p_gatectrl(S5P_DAC_PHY_CONTROL, clk, enable);
+}
+
+static int exynos4_clksrc_mask_maudio_ctrl(struct clk *clk, int enable)
+{
+    return s5p_gatectrl(EXYNOS4_CLKSRC_MASK_MAUDIO, clk, enable);
+}
+
+static int exynos4_clk_audss_ctrl(struct clk *clk, int enable)
+{
+    return s5p_gatectrl(EXYNOS4_CLKGATE_AUDSS, clk, enable);
 }
 
 /* Core list of CMU_CPU side */
@@ -648,11 +678,31 @@ static struct clk exynos4_init_clocks_off[] = {
 		.devname	= "samsung-ac97",
 		.enable		= exynos4_clk_ip_peril_ctrl,
 		.ctrlbit	= (1 << 27),
-	}, {
-		.name		= "fimg2d",
-		.enable		= exynos4_clk_ip_image_ctrl,
-		.ctrlbit	= (1 << 0),
-	}, {
+  }, {
+    .name   = "pcm",
+    .id   = 0,
+    .enable   = exynos4_clk_audss_ctrl,
+    .ctrlbit  = (1 << 5)
+  }, {
+    .name   = "pcm",
+    .id   = 1,
+    .enable   = exynos4_clk_ip_peril_ctrl,
+    .ctrlbit  = (1 << 22),
+  }, {
+    .name   = "pcm",
+    .id   = 2,
+    .enable   = exynos4_clk_ip_peril_ctrl,
+    .ctrlbit  = (1 << 23),
+  }, {
+        .name           = "spdif",
+        .devname    = "samsung-spdif",
+        .enable         = exynos4_clk_ip_peril_ctrl,
+        .ctrlbit        = (1 << 26),
+    }, {
+        .name       = "fimg2d",
+        .enable     = exynos4_clk_ip_image_ctrl,
+        .ctrlbit    = (1 << 0),
+    }, {
 		.name		= "mfc",
 		.devname	= "s5p-mfc",
 		.enable		= exynos4_clk_ip_mfc_ctrl,
@@ -852,12 +902,183 @@ static struct clksrc_sources exynos4_clkset_mout_audss = {
 	.nr_sources	= ARRAY_SIZE(exynos4_clkset_mout_audss_list),
 };
 
-static struct clksrc_clk exynos4_clk_mout_audss = {
+static struct clksrc_clk clk_mout_audss = {
 	.clk		= {
 		.name		= "busclk",
 	},
 	.sources	= &exynos4_clkset_mout_audss,
 	.reg_src	= { .reg = EXYNOS4_CLKSRC_AUDSS, .shift = 0, .size = 1 },
+};
+static struct clk *exynos4_clkset_sclk_audio0_list[] = {
+       [0] = &exynos4_clk_audiocdclk0,
+       [1] = NULL,
+       [2] = &exynos4_clk_sclk_hdmi27m,
+       [3] = &exynos4_clk_sclk_usbphy0,
+       [4] = &exynos4_clk_xxti,
+       [5] = &clk_xusbxti,
+       [6] = &exynos4_clk_mout_mpll.clk,
+       [7] = &exynos4_clk_mout_epll.clk,
+       [8] = &exynos4_clk_sclk_vpll.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_sclk_audio0 = {
+       .sources        = exynos4_clkset_sclk_audio0_list,
+       .nr_sources     = ARRAY_SIZE(exynos4_clkset_sclk_audio0_list),
+};
+
+static struct clksrc_clk exynos4_clk_sclk_audio0 = {
+       .clk            = {
+               .name           = "sclk_audio",
+                             .devname        = "soc-audio",
+                             .id             = 0,
+               .enable         = exynos4_clksrc_mask_maudio_ctrl,
+               .ctrlbit        = (1 << 0),
+       },
+       .sources = &exynos4_clkset_sclk_audio0,
+       .reg_src = { .reg = EXYNOS4_CLKSRC_MAUDIO, .shift = 0, .size = 4 },
+       .reg_div = { .reg = EXYNOS4_CLKDIV_MAUDIO, .shift = 0, .size = 4 },
+};
+
+static struct clk *exynos4_clkset_sclk_audio1_list[] = {
+       [0] = &exynos4_clk_audiocdclk1,
+       [1] = NULL,
+       [2] = &exynos4_clk_sclk_hdmi27m,
+       [3] = &exynos4_clk_sclk_usbphy0,
+       [4] = &exynos4_clk_xxti,
+       [5] = &clk_xusbxti,
+       [6] = &exynos4_clk_mout_mpll.clk,
+       [7] = &exynos4_clk_mout_epll.clk,
+       [8] = &exynos4_clk_sclk_vpll.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_sclk_audio1 = {
+       .sources        = exynos4_clkset_sclk_audio1_list,
+      .nr_sources     = ARRAY_SIZE(exynos4_clkset_sclk_audio1_list),
+};
+
+static struct clksrc_clk exynos4_clk_sclk_audio1 = {
+               .clk            = {
+               .name           = "sclk_audio",
+                             .devname        = "soc-audio",
+                             .id             = 1,
+               .enable         = exynos4_clksrc_mask_peril1_ctrl,
+               .ctrlbit        = (1 << 0),
+       },
+       .sources = &exynos4_clkset_sclk_audio1,
+       .reg_src = { .reg = EXYNOS4_CLKSRC_PERIL1, .shift = 0, .size = 4 },
+       .reg_div = { .reg = EXYNOS4_CLKDIV_PERIL4, .shift = 4, .size = 8 },
+};
+
+static struct clk *exynos4_clkset_sclk_audio2_list[] = {
+       [0] = &exynos4_clk_audiocdclk2,
+       [1] = NULL, /* Why is this null. */
+       [2] = &exynos4_clk_sclk_hdmi27m,
+       [3] = &exynos4_clk_sclk_usbphy0,
+       [4] = &exynos4_clk_xxti,
+       [5] = &clk_xusbxti,
+       [6] = &exynos4_clk_mout_mpll.clk,
+       [7] = &exynos4_clk_mout_epll.clk,
+       [8] = &exynos4_clk_sclk_vpll.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_sclk_audio2 = {
+       .sources        = exynos4_clkset_sclk_audio2_list,
+       .nr_sources     = ARRAY_SIZE(exynos4_clkset_sclk_audio2_list),
+};
+
+static struct clksrc_clk exynos4_clk_sclk_audio2 = {
+       .clk    = {
+               .name           = "sclk_audio",
+                             .devname        = "soc-audio",
+                             .id             = 2,
+               .enable         = exynos4_clksrc_mask_peril1_ctrl,
+               .ctrlbit        = (1 << 4),
+       },
+       .sources = &exynos4_clkset_sclk_audio2,
+       .reg_src = { .reg = EXYNOS4_CLKSRC_PERIL1, .shift = 4, .size = 4 },
+       .reg_div = { .reg = EXYNOS4_CLKDIV_PERIL4, .shift = 16, .size = 4 },
+};
+
+static struct clk *clkset_sclk_audss_list[] = {
+       &clk_mout_audss.clk,
+       &exynos4_clk_audiocdclk0,
+       &exynos4_clk_sclk_audio0.clk,
+};
+
+static struct clksrc_sources exynos4_clkset_sclk_audss = {
+       .sources        = clkset_sclk_audss_list,
+       .nr_sources     = ARRAY_SIZE(clkset_sclk_audss_list),
+};
+
+static struct clksrc_clk clk_sclk_audss = {
+       .clk            = {
+               .name           = "i2sclk",
+               .id             = -1,
+               .enable         = exynos4_clk_audss_ctrl,
+               .ctrlbit        = EXYNOS4_AUDSS_CLKGATE_I2SBUS,
+       },
+       .sources        = &exynos4_clkset_sclk_audss,
+       .reg_src        = { .reg = EXYNOS4_CLKSRC_AUDSS, .shift = 2, .size = 2 },
+       .reg_div        = { .reg = EXYNOS4_CLKDIV_AUDSS, .shift = 4, .size = 8 },
+};
+
+static struct clk *exynos4_clkset_sclk_spdif_list[] = {
+       [0] = &exynos4_clk_sclk_audio0.clk,
+       [1] = &exynos4_clk_sclk_audio1.clk,
+       [2] = &exynos4_clk_sclk_audio2.clk,
+       [3] = &exynos4_clk_spdifcdclk,
+};
+
+static struct clksrc_sources exynos4_clkset_sclk_spdif = {
+       .sources        = exynos4_clkset_sclk_spdif_list,
+       .nr_sources     = ARRAY_SIZE(exynos4_clkset_sclk_spdif_list),
+};
+
+static int exynos4_spdif_set_rate(struct clk *clk, unsigned long rate)
+{
+       struct clk *pclk;
+       int ret;
+
+       pclk = clk_get_parent(clk);
+       if (IS_ERR(pclk))
+               return -EINVAL;
+
+       ret = pclk->ops->set_rate(pclk, rate);
+       clk_put(pclk);
+
+       return ret;
+}
+
+static unsigned long exynos4_spdif_get_rate(struct clk *clk)
+{
+       struct clk *pclk;
+       int rate;
+
+       pclk = clk_get_parent(clk);
+       if (IS_ERR(pclk))
+               return -EINVAL;
+
+       rate = pclk->ops->get_rate(clk);
+       clk_put(pclk);
+
+       return rate;
+}
+
+static struct clk_ops exynos4_sclk_spdif_ops = {
+       .set_rate       = exynos4_spdif_set_rate,
+       .get_rate       = exynos4_spdif_get_rate,
+};
+
+static struct clksrc_clk exynos4_clk_sclk_spdif = {
+       .clk    = {
+               .name           = "sclk_spdif",
+               .id             = -1,
+               .enable         = exynos4_clksrc_mask_peril1_ctrl,
+               .ctrlbit        = (1 << 8),
+               .ops            = &exynos4_sclk_spdif_ops,
+       },
+       .sources = &exynos4_clkset_sclk_spdif,
+       .reg_src = { .reg = EXYNOS4_CLKSRC_PERIL1, .shift = 8, .size = 2 },
 };
 
 struct clk *exynos4_clkset_group_list[] = {
@@ -1438,7 +1659,7 @@ static struct clksrc_clk *exynos4_sysclks[] = {
 	&exynos4_clk_aclk_100,
 	&exynos4_clk_aclk_160,
 	&exynos4_clk_aclk_133,
-	&exynos4_clk_mout_audss,
+	&clk_mout_audss,
 	&exynos4_clk_dout_mmc0,
 	&exynos4_clk_dout_mmc1,
 	&exynos4_clk_dout_mmc2,
@@ -1448,6 +1669,11 @@ static struct clksrc_clk *exynos4_sysclks[] = {
 	&exynos4_clk_mout_mfc1,
 	&exynos4_clk_mout_g3d0,
 	&exynos4_clk_mout_g3d1,
+	&clk_sclk_audss,
+    &exynos4_clk_sclk_audio0,
+    &exynos4_clk_sclk_audio1,
+    &exynos4_clk_sclk_audio2,
+    &exynos4_clk_sclk_spdif,
 };
 
 static struct clk *exynos4_clk_cdev[] = {
@@ -1706,7 +1932,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 
 	clk_fout_epll.enable = s5p_epll_enable;
 	clk_fout_epll.ops = &exynos4_epll_ops;
-	clk_set_parent(&exynos4_clk_mout_audss.clk, &clk_fout_epll);
+	clk_set_parent(&clk_mout_audss.clk, &clk_fout_epll);
 
 	printk(KERN_INFO "EXYNOS4: PLL settings, A=%ld, M=%ld, E=%ld V=%ld",
 			apll, mpll, epll, vpll);
@@ -1728,6 +1954,9 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 	clk_h.rate = sclk_dmc;
 	clk_p.rate = aclk_100;
 
+    clk_set_parent(&clk_sclk_audss.clk, &clk_mout_audss.clk);
+    clk_set_parent(&clk_mout_audss.clk, &clk_fout_epll);
+    clk_set_parent(&exynos4_clk_sclk_audio0.clk, &exynos4_clk_mout_epll.clk);
 	for (ptr = 0; ptr < ARRAY_SIZE(exynos4_clksrcs); ptr++)
 		s3c_set_clksrc(&exynos4_clksrcs[ptr], true);
 }

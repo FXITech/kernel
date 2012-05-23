@@ -33,9 +33,17 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 	 * If a dma channel property of a device node from device tree is
 	 * specified, use that as the fliter parameter.
 	 */
-	filter_param = (dma_ch == DMACH_DT_PROP) ? (void *)info->dt_dmach_prop :
-				(void *)dma_ch;
-	chan = dma_request_channel(mask, pl330_filter, filter_param);
+	 if(dma_ch == DMACH_DT_PROP){
+	 	printk(KERN_DEBUG "dmadev: using DMACH_DT_PROP");
+	 	filter_param = (void *)info->dt_dmach_prop;
+	 	chan = dma_request_channel(mask, pl330_filter, filter_param);
+	 } else {
+	 	printk(KERN_DEBUG "dmadev: using dma_ch");
+	 	chan = dma_request_channel(mask, pl330_filter, NULL);
+	 }
+
+	
+	printk(KERN_DEBUG "dmadev: chan = %p\n", chan);
 
 	if (info->direction == DMA_DEV_TO_MEM) {
 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
@@ -43,6 +51,7 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 		slave_config.src_addr = info->fifo;
 		slave_config.src_addr_width = info->width;
 		slave_config.src_maxburst = 1;
+		printk(KERN_DEBUG "dmadev 1\n");
 		dmaengine_slave_config(chan, &slave_config);
 	} else if (info->direction == DMA_MEM_TO_DEV) {
 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
@@ -50,6 +59,8 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 		slave_config.dst_addr = info->fifo;
 		slave_config.dst_addr_width = info->width;
 		slave_config.dst_maxburst = 1;
+		printk(KERN_DEBUG "dmadev 2dt\n");
+		printk(KERN_DEBUG "dmadev: dst_addr: %x\n", (unsigned int)slave_config.dst_addr);
 		dmaengine_slave_config(chan, &slave_config);
 	}
 

@@ -19,6 +19,7 @@
 
 #define HDMI_CTRL_BASE(x)		((x) + 0x00000000)
 #define HDMI_CORE_BASE(x)		((x) + 0x00010000)
+#define HDMI_SPDIF_BASE(x)      ((x) + 0x00030000)
 #define HDMI_I2S_BASE(x)		((x) + 0x00040000)
 #define HDMI_TG_BASE(x)			((x) + 0x00050000)
 
@@ -170,6 +171,30 @@
 #define HDMI_MODE_DVI_EN		(1 << 0)
 #define HDMI_MODE_MASK			(3 << 0)
 
+/* HDMI SPDIF registers */
+#define HDMI_SPDIF_CLK_CTRL          HDMI_SPDIF_BASE(0x0000)
+#define HDMI_SPDIF_OP_CTRL          HDMI_SPDIF_BASE(0x0004)
+#define HDMI_SPDIF_IRQ_MASK         HDMI_SPDIF_BASE(0x0008)
+#define HDMI_SPDIF_CONFIG_1         HDMI_SPDIF_BASE(0x0010)
+#define HDMI_SPDIF_CONFIG_2       HDMI_SPDIF_BASE(0x0014)
+#define HDMI_SPDIF_USER_VALUE_1   HDMI_SPDIF_BASE(0x0020)
+#define HDMI_SPDIF_USER_VALUE_2   HDMI_SPDIF_BASE(0x0024)
+#define HDMI_SPDIF_USER_VALUE_3   HDMI_SPDIF_BASE(0x0028)
+#define HDMI_SPDIF_USER_VALUE_4   HDMI_SPDIF_BASE(0x002C)
+
+/* SPDIF Configs */
+#define HDMI_SPDIF_CLK_ON (1 << 0)
+#define HDMI_SPDIF_READY_CLK_DOWN (1 << 1)
+#define HDMI_SPDIF_STATUS_CHK_OP_MODE (3)
+#define HDMI_SPDIF_CONFIG_1_FILTER_M        (1 << 6)
+#define HDMI_SPDIF_CONFIG_1_PCPD_M          (1 << 4)
+#define HDMI_SPDIF_CONFIG_1_WORD_LENGHT_M   (1 << 3)
+#define HDMI_SPDIF_CONFIG_1_UVCP_REPORT     (1 << 2)
+#define HDMI_SPDIF_CONFIG_1_BURST_SIZE_2    (1 << 1)
+#define HDMI_SPDIF_CONFIG_1_DATA_ALIGN_32BIT (1 << 0)
+#define HDMI_SPDIF_CONFIG_2_NO_CLK_DIV (0)
+#define HDMI_SPDIF_USER_VALUE1_WL_24BIT (0xB)
+#define HDMI_SPDIF_IRQ_OVERFLOW_ENABLE (1 << 7)
 /* HDMI I2S register */
 #define HDMI_I2S_CLK_CON		HDMI_I2S_BASE(0x000)
 #define HDMI_I2S_CON_1			HDMI_I2S_BASE(0x004)
@@ -222,10 +247,14 @@
 #define HDMI_I2S_SEL_DSD(x)		((x) & 0x7)
 
 /* I2S_MUX_CON */
-#define HDMI_I2S_IN_DISABLE		(1 << 4)
-#define HDMI_I2S_AUD_I2S		(1 << 2)
-#define HDMI_I2S_CUV_I2S_ENABLE		(1 << 1)
-#define HDMI_I2S_MUX_ENABLE		(1)
+#define HDMI_I2S_IN_DISABLE		  (1 << 4)
+#define HDMI_I2S_AUD_DSD          (2 << 2) 
+#define HDMI_I2S_AUD_I2S		  (1 << 2)
+#define HDMI_I2S_AUD_SPDIF        (0 << 2)
+#define HDMI_I2S_CUV_I2S_ENABLE	  (1 << 1)
+#define HDMI_I2S_CUV_SPDIF_ENABLE (0 << 1)
+#define HDMI_I2S_MUX_ENABLE		  (1)
+
 
 /* I2S_CH_ST_CON */
 #define HDMI_I2S_CH_STATUS_RELOAD	(1)
@@ -262,6 +291,7 @@
 #define HDMI_I2S_CH2_EN			(3 << 4)
 #define HDMI_I2S_CH1_EN			(3 << 2)
 #define HDMI_I2S_CH0_EN			(3)
+#define HDMI_I2S_CH_ALL         (0xFF)
 
 /* I2S_MUX_CUV */
 #define HDMI_I2S_CUV_RL_EN		(0x03)

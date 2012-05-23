@@ -111,7 +111,7 @@ static void spdif_snd_txctrl(struct samsung_spdif_info *spdif, int on)
 	void __iomem *regs = spdif->regs;
 	u32 clkcon;
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	clkcon = readl(regs + CLKCON) & CLKCTL_MASK;
 	if (on)
@@ -126,7 +126,7 @@ static int spdif_set_sysclk(struct snd_soc_dai *cpu_dai,
 	struct samsung_spdif_info *spdif = to_info(cpu_dai);
 	u32 clkcon;
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	clkcon = readl(spdif->regs + CLKCON);
 
@@ -149,7 +149,7 @@ static int spdif_trigger(struct snd_pcm_substream *substream, int cmd,
 	struct samsung_spdif_info *spdif = to_info(rtd->cpu_dai);
 	unsigned long flags;
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
@@ -189,17 +189,18 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 	unsigned long flags;
 	int i, ratio;
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		dma_data = spdif->dma_playback;
 	else {
-		dev_err(spdif->dev, "Capture is not supported\n");
+		printk(KERN_DEBUG "Capture is not supported\n");
 		return -EINVAL;
 	}
+	printk(KERN_DEBUG "%s 1\n", __func__);
 
 	snd_soc_dai_set_dma_data(rtd->cpu_dai, substream, dma_data);
-
+	printk(KERN_DEBUG "%s 2\n", __func__);
 	spin_lock_irqsave(&spdif->lock, flags);
 
 	con = readl(regs + CON) & CON_MASK;
@@ -217,7 +218,7 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 		con |= CON_PCM_16BIT;
 		break;
 	default:
-		dev_err(spdif->dev, "Unsupported data size.\n");
+		printk(KERN_DEBUG "Unsupported data size.\n");
 		goto err;
 	}
 
@@ -226,7 +227,7 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 		if (ratio == spdif_sysclk_ratios[i])
 			break;
 	if (i == ARRAY_SIZE(spdif_sysclk_ratios)) {
-		dev_err(spdif->dev, "Invalid clock ratio %ld/%d\n",
+		printk(KERN_DEBUG "Invalid clock ratio %ld/%d\n",
 				spdif->clk_rate, params_rate(params));
 		goto err;
 	}
@@ -259,7 +260,7 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 		cstas |= CSTAS_SAMP_FREQ_96;
 		break;
 	default:
-		dev_err(spdif->dev, "Invalid sampling rate %d\n",
+		printk(KERN_DEBUG "Invalid sampling rate %d\n",
 				params_rate(params));
 		goto err;
 	}
@@ -273,9 +274,10 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 	writel(clkcon, regs + CLKCON);
 
 	spin_unlock_irqrestore(&spdif->lock, flags);
-
+	printk(KERN_DEBUG "%s 3\n", __func__);
 	return 0;
 err:
+	printk(KERN_DEBUG "%s 4\n", __func__);
 	spin_unlock_irqrestore(&spdif->lock, flags);
 	return -EINVAL;
 }
@@ -288,7 +290,7 @@ static void spdif_shutdown(struct snd_pcm_substream *substream,
 	void __iomem *regs = spdif->regs;
 	u32 con, clkcon;
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	con = readl(regs + CON) & CON_MASK;
 	clkcon = readl(regs + CLKCON) & CLKCTL_MASK;
@@ -305,7 +307,7 @@ static int spdif_suspend(struct snd_soc_dai *cpu_dai)
 	struct samsung_spdif_info *spdif = to_info(cpu_dai);
 	u32 con = spdif->saved_con;
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	spdif->saved_clkcon = readl(spdif->regs	+ CLKCON) & CLKCTL_MASK;
 	spdif->saved_con = readl(spdif->regs + CON) & CON_MASK;
@@ -321,7 +323,7 @@ static int spdif_resume(struct snd_soc_dai *cpu_dai)
 {
 	struct samsung_spdif_info *spdif = to_info(cpu_dai);
 
-	dev_dbg(spdif->dev, "Entered %s\n", __func__);
+	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	writel(spdif->saved_clkcon, spdif->regs	+ CLKCON);
 	writel(spdif->saved_con, spdif->regs + CON);
