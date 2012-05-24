@@ -411,7 +411,7 @@ static struct max8997_regulator_data __initdata fxi_c210_max8997_regulators[] = 
   { MAX8997_LDO8,   &max8997_ldo8_data },
   { MAX8997_LDO9,   &max8997_ldo9_data },
   { MAX8997_LDO10,  &max8997_ldo10_data },
-  { MAX8997_LDO10,  &max8997_ldo17_data },
+  { MAX8997_LDO17,  &max8997_ldo17_data },
 
   { MAX8997_BUCK1,  &max8997_buck1_data },
   { MAX8997_BUCK2,  &max8997_buck2_data },
