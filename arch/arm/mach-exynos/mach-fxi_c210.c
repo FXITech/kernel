@@ -693,7 +693,6 @@ static struct platform_device fxi_c210_device_gpiokeys = {
 static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
 {
 	int ret;
-<<<<<<< HEAD
 
 	if (power)
 		ret = gpio_request_one(EXYNOS4_GPE3(4),
@@ -708,22 +707,6 @@ static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
 		pr_err("failed to request gpio for LCD power: %d\n", ret);
 }
 
-=======
-
-	if (power)
-		ret = gpio_request_one(EXYNOS4_GPE3(4),
-					GPIOF_OUT_INIT_HIGH, "GPE3_4");
-	else
-		ret = gpio_request_one(EXYNOS4_GPE3(4),
-					GPIOF_OUT_INIT_LOW, "GPE3_4");
-
-	gpio_free(EXYNOS4_GPE3(4));
-
-	if (ret)
-		pr_err("failed to request gpio for LCD power: %d\n", ret);
-}
-
->>>>>>> parent of a9b1745... Removes dead code from FXI C210 machine file.
 static struct plat_lcd_data fxi_c210_lcd_hv070wsa_data = {
 	.set_power = lcd_hv070wsa_set_power,
 	.min_uV		= 3300000,
