@@ -191,8 +191,10 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 
 	printk(KERN_DEBUG "Entered %s\n", __func__);
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
+		printk(KERN_DEBUG "%s - substream is SNDRV_PCM_STREAM_PLAYBACK\n", __func__);
 		dma_data = spdif->dma_playback;
+	}
 	else {
 		printk(KERN_DEBUG "Capture is not supported\n");
 		return -EINVAL;

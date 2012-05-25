@@ -21,6 +21,7 @@
 #include <sound/pcm.h>
 #include <sound/initval.h>
 
+
 #define DRV_NAME "spdif-dit"
 
 #define STUB_RATES	SNDRV_PCM_RATE_8000_96000
@@ -39,6 +40,7 @@ static struct snd_soc_dai_driver dit_stub_dai = {
 		.formats	= STUB_FORMATS,
 	},
 };
+
 
 static int spdif_dit_probe(struct platform_device *pdev)
 {

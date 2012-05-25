@@ -87,7 +87,7 @@
 #define S3C2410_PA_IIC	   (0x54000000)
 
 /* IIS controller */
-#define S3C2410_PA_IIS	   (0x55000000)
+#define S3C2410_PA_IIS	   (0x03830000)
 
 /* RTC */
 #define S3C2410_PA_RTC	   (0x57000000)

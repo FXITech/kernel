@@ -285,16 +285,13 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	hdmi_set_acr(sample_rate, acr);
 	hdmi_reg_acr(hdev, acr);
 
-/* Original:
+
 	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
 			| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
 			| HDMI_I2S_MUX_ENABLE);
-*/
-	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
-			| HDMI_I2S_AUD_SPDIF | HDMI_I2S_CUV_I2S_ENABLE
-			| HDMI_I2S_MUX_ENABLE);
 
-	hdmi_writeb(hdev, HDMI_I2S_MUX_CH, HDMI_I2S_CH_ALL);
+	hdmi_writeb(hdev, HDMI_I2S_MUX_CH, HDMI_I2S_CH0_EN
+			| HDMI_I2S_CH1_EN | HDMI_I2S_CH2_EN);
 
 	hdmi_writeb(hdev, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
 
@@ -305,32 +302,6 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 
 	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
 	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
-/*
-HDMI_SPDIF_CLK_ON
-HDMI_SPDIF_READY_CLK_DOWN (1 << 1)
-HDMI_SPDIF_STATUS_CHK_OP_MODE (3)
-HDMI_SPDIF_USER_VALUE1_WL_24BIT (0xB)
-
-*/
-	hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_1,
-			HDMI_SPDIF_CONFIG_1_FILTER_M |
-			HDMI_SPDIF_CONFIG_1_PCPD_M |
-			HDMI_SPDIF_CONFIG_1_WORD_LENGHT_M |
-			HDMI_SPDIF_CONFIG_1_UVCP_REPORT |
-			HDMI_SPDIF_CONFIG_1_BURST_SIZE_2 |
-			HDMI_SPDIF_CONFIG_1_DATA_ALIGN_32BIT);
-
-	hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_2,
-			HDMI_SPDIF_CONFIG_2_NO_CLK_DIV);
-
-	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, HDMI_SPDIF_CLK_ON);
-
-	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, HDMI_SPDIF_STATUS_CHK_OP_MODE);
-
-	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_1, HDMI_SPDIF_USER_VALUE1_WL_24BIT);
-	hdmi_writeb(hdev, HDMI_SPDIF_IRQ_MASK, HDMI_SPDIF_IRQ_OVERFLOW_ENABLE);
-
-#if 0
 	val = hdmi_read(hdev, HDMI_I2S_DSD_CON) | 0x01;
 	hdmi_writeb(hdev, HDMI_I2S_DSD_CON, val);
 
@@ -368,7 +339,6 @@ HDMI_SPDIF_USER_VALUE1_WL_24BIT (0xB)
 			| HDMI_I2S_WORD_LEN_MAX_24BITS);
 
 	hdmi_writeb(hdev, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
-#endif
 
 }
 

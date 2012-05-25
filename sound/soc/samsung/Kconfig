@@ -8,6 +8,9 @@ config SND_SOC_SAMSUNG
 	  the Samsung SoCs' Audio interfaces. You will also need to
 	  select the audio interfaces to support below.
 
+config SND_FXI
+	tristate
+
 config SND_S3C24XX_I2S
 	tristate
 	select S3C2410_DMA
@@ -44,6 +47,15 @@ config SND_SOC_SAMSUNG_NEO1973_WM8753
 	help
 	  Say Y here to enable audio support for the Openmoko Neo1973
 	  Smartphones.
+
+config SND_SOC_SAMSUNG_I2S_FXI
+	tristate "I2S Audio for FXI"
+	depends on MACH_FXI_C210
+	select SND_FXI
+	select SND_SAMSUNG_I2S
+	select SND_SAMSUNG_SPDIF
+	help
+	Say Y if you want to add support for I2S SoC Audio on Cotton Candy.
 
 config SND_SOC_SAMSUNG_JIVE_WM8750
 	tristate "SoC I2S Audio support for Jive"

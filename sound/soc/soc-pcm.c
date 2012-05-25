@@ -118,7 +118,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	pm_runtime_get_sync(platform->dev);
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
-
+	printk(KERN_DEBUG "in %s\n", __func__);
 	/* startup the audio subsystem */
 	if (cpu_dai->driver->ops->startup) {
 		ret = cpu_dai->driver->ops->startup(substream, cpu_dai);
@@ -240,12 +240,12 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 			goto config_err;
 	}
 
-	pr_debug("asoc: %s <-> %s info:\n",
+	printk(KERN_DEBUG "asoc: %s <-> %s info:\n",
 			codec_dai->name, cpu_dai->name);
-	pr_debug("asoc: rate mask 0x%x\n", runtime->hw.rates);
-	pr_debug("asoc: min ch %d max ch %d\n", runtime->hw.channels_min,
+	printk(KERN_DEBUG "asoc: rate mask 0x%x\n", runtime->hw.rates);
+	printk(KERN_DEBUG "asoc: min ch %d max ch %d\n", runtime->hw.channels_min,
 		 runtime->hw.channels_max);
-	pr_debug("asoc: min rate %d max rate %d\n", runtime->hw.rate_min,
+	printk(KERN_DEBUG "asoc: min rate %d max rate %d\n", runtime->hw.rate_min,
 		 runtime->hw.rate_max);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
@@ -258,6 +258,7 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	cpu_dai->active++;
 	codec_dai->active++;
 	rtd->codec->active++;
+	printk(KERN_DEBUG "exiting (active) %s\n", __func__);
 	mutex_unlock(&rtd->pcm_mutex);
 	return 0;
 
@@ -277,6 +278,7 @@ platform_err:
 	if (cpu_dai->driver->ops->shutdown)
 		cpu_dai->driver->ops->shutdown(substream, cpu_dai);
 out:
+	printk(KERN_DEBUG "exiting (couldnt open) %s\n", __func__);
 	mutex_unlock(&rtd->pcm_mutex);
 
 	pm_runtime_put(platform->dev);
@@ -299,7 +301,7 @@ static void close_delayed_work(struct work_struct *work)
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
-	pr_debug("pop wq checking: %s status: %s waiting: %s\n",
+	printk(KERN_DEBUG "pop wq checking: %s status: %s waiting: %s\n",
 		 codec_dai->driver->playback.stream_name,
 		 codec_dai->playback_active ? "active" : "inactive",
 		 codec_dai->pop_wait ? "yes" : "no");
@@ -482,12 +484,13 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	if (rtd->dai_link->ops && rtd->dai_link->ops->hw_params) {
 		ret = rtd->dai_link->ops->hw_params(substream, params);
 		if (ret < 0) {
-			pr_err("asoc: machine hw_params failed: %d\n", ret);
+			pr_err("asoc: machine hw_params failed: %d\n for %s", ret, rtd->dai_link->name);
 			goto out;
 		}
 	}
 
 	if (codec_dai->driver->ops->hw_params) {
+		printk(KERN_DEBUG "%s codec_dai hw_params", __func__);
 		ret = codec_dai->driver->ops->hw_params(substream, params, codec_dai);
 		if (ret < 0) {
 			dev_err(codec_dai->dev, "can't set %s hw params: %d\n",
@@ -497,6 +500,7 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	if (cpu_dai->driver->ops->hw_params) {
+		printk(KERN_DEBUG "%s cpu_dai hw_params", __func__);
 		ret = cpu_dai->driver->ops->hw_params(substream, params, cpu_dai);
 		if (ret < 0) {
 			dev_err(cpu_dai->dev, "%s hw params failed: %d\n",
@@ -506,6 +510,7 @@ static int soc_pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	if (platform->driver->ops && platform->driver->ops->hw_params) {
+		printk(KERN_DEBUG "%s driver->ops hw_params", __func__);
 		ret = platform->driver->ops->hw_params(substream, params);
 		if (ret < 0) {
 			dev_err(platform->dev, "%s hw params failed: %d\n",
@@ -581,7 +586,7 @@ static int soc_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	int ret;
-
+	printk(KERN_DEBUG "%s codec_dai hw_params", __func__);
 	if (codec_dai->driver->ops->trigger) {
 		ret = codec_dai->driver->ops->trigger(substream, cmd, codec_dai);
 		if (ret < 0)
