@@ -236,9 +236,13 @@ static void sdhci_s3c_set_clock(struct sdhci_host *host, unsigned int clock)
 	writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL2);
 
 	/* reconfigure the controller for new clock rate */
-	ctrl = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
-	if (clock < 25 * 1000000)
-		ctrl |= (S3C_SDHCI_CTRL3_FCSEL3 | S3C_SDHCI_CTRL3_FCSEL2);
+	if (host->mmc->caps2 & MMC_CAP2_FCL_DELAY_INV) {
+		ctrl = 0;
+	} else {
+		ctrl = (S3C_SDHCI_CTRL3_FCSEL1 | S3C_SDHCI_CTRL3_FCSEL0);
+		if (clock < 25 * 1000000)
+			ctrl |= (S3C_SDHCI_CTRL3_FCSEL3 | S3C_SDHCI_CTRL3_FCSEL2);
+	}
 	writel(ctrl, host->ioaddr + S3C_SDHCI_CONTROL3);
 }
 

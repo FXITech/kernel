@@ -411,7 +411,7 @@ static struct max8997_regulator_data __initdata fxi_c210_max8997_regulators[] = 
   { MAX8997_LDO8,   &max8997_ldo8_data },
   { MAX8997_LDO9,   &max8997_ldo9_data },
   { MAX8997_LDO10,  &max8997_ldo10_data },
-  { MAX8997_LDO10,  &max8997_ldo17_data },
+  { MAX8997_LDO17,  &max8997_ldo17_data },
 
   { MAX8997_BUCK1,  &max8997_buck1_data },
   { MAX8997_BUCK2,  &max8997_buck2_data },
@@ -486,7 +486,7 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
 	},
 };
 
-static struct s3c_sdhci_platdata fxi_c210_hsmmc0_pdata __initdata = {
+static struct s3c_sdhci_platdata fxi_c210_hsmmc3_pdata __initdata = {
 	.cd_type		= S3C_SDHCI_CD_INTERNAL,
 };
 
@@ -496,25 +496,13 @@ static struct s3c_sdhci_platdata fxi_c210_hsmmc2_pdata __initdata = {
 
 
 /*
- * WLAN: SDIO Host will call this func at booting time
- */
-static int fxi_c210_wifi_status_register(void (*notify_func)
-		(struct platform_device *, int state));
-
-/* WLAN: MMC3-SDIO */
-static struct s3c_sdhci_platdata fxi_c210_hsmmc3_pdata __initdata = {
-	.max_width		= 4,
-	.host_caps		= MMC_CAP_4_BIT_DATA |
-			MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
-	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
-	.ext_cd_init		= fxi_c210_wifi_status_register,
-};
-
-/*
  * WLAN: Save SDIO Card detect func into this pointer
  */
 static void (*wifi_status_cb)(struct platform_device *, int state);
 
+/*
+ * WLAN: SDIO Host will call this func at booting time
+ */
 static int fxi_c210_wifi_status_register(void (*notify_func)
 		(struct platform_device *, int state))
 {
@@ -526,36 +514,55 @@ static int fxi_c210_wifi_status_register(void (*notify_func)
 	return 0;
 }
 
-#define FXI_C210_WLAN_WOW EXYNOS4_GPX2(3)
-#define FXI_C210_WLAN_RESET EXYNOS4_GPX2(4)
+/* WLAN: MMC0-SDIO */
+static struct s3c_sdhci_platdata fxi_c210_hsmmc0_pdata __initdata = {
+	.max_width		= 4,
+	.host_caps		= MMC_CAP_4_BIT_DATA |
+			MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+	.host_caps2		= MMC_CAP2_FCL_DELAY_INV,
+	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
+	.ext_cd_init		= fxi_c210_wifi_status_register,
+};
 
 
-static void fxi_c210_wlan_setup_power(bool val)
+#define GPIO_WLAN_SDIO_CLK	EXYNOS4_GPK0(0)
+#define GPIO_WLAN_SDIO_CMD	EXYNOS4_GPK0(1)
+#define GPIO_WLAN_SDIO_D0	EXYNOS4_GPK0(3)
+#define GPIO_WLAN_SDIO_D1	EXYNOS4_GPK0(4)
+#define GPIO_WLAN_SDIO_D2	EXYNOS4_GPK0(5)
+#define GPIO_WLAN_SDIO_D3	EXYNOS4_GPK0(6)
+
+static void fxi_c210_wlan_enable(void)
 {
-	int err;
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CLK, S3C_GPIO_SFN(2));
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CMD, S3C_GPIO_SFN(2));
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D0, S3C_GPIO_SFN(2));
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D1, S3C_GPIO_SFN(2));
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D2, S3C_GPIO_SFN(2));
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D3, S3C_GPIO_SFN(2));
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_CLK, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_CMD, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D0, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D1, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D2, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D3, S3C_GPIO_PULL_NONE);
 
-	if (val) {
-		err = gpio_request_one(FXI_C210_WLAN_RESET,
-				GPIOF_OUT_INIT_LOW, "GPX2_4");
-		if (err) {
-			pr_warning("FXI_C210: Not obtain WIFI gpios\n");
-			return;
-		}
-		s3c_gpio_cfgpin(FXI_C210_WLAN_RESET, S3C_GPIO_OUTPUT);
-		s3c_gpio_setpull(FXI_C210_WLAN_RESET,
-						S3C_GPIO_PULL_NONE);
-		/* VDD33,I/O Supply must be done */
-		gpio_set_value(FXI_C210_WLAN_RESET, 0);
-		udelay(30);	/*Tb */
-		gpio_direction_output(FXI_C210_WLAN_RESET, 1);
-	} else {
-		gpio_direction_output(FXI_C210_WLAN_RESET, 0);
-		gpio_free(FXI_C210_WLAN_RESET);
-	}
+	msleep(100);
+}
 
-	mdelay(100);
-
-	return;
+static void fxi_c210_wlan_disable(void) {
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CLK, S3C_GPIO_INPUT);
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CMD, S3C_GPIO_INPUT);
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D0, S3C_GPIO_INPUT);
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D1, S3C_GPIO_INPUT);
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D2, S3C_GPIO_INPUT);
+	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D3, S3C_GPIO_INPUT);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_CLK, S3C_GPIO_PULL_DOWN);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_CMD, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D0, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D1, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D2, S3C_GPIO_PULL_NONE);
+	s3c_gpio_setpull(GPIO_WLAN_SDIO_D3, S3C_GPIO_PULL_NONE);
 }
 
 /*
@@ -563,24 +570,41 @@ static void fxi_c210_wlan_setup_power(bool val)
  */
 static int fxi_c210_wifi_set_detect(bool val)
 {
+	if (val)
+		fxi_c210_wlan_enable();
+	else
+		fxi_c210_wlan_disable();
+
 	if (!wifi_status_cb) {
 		printk(KERN_WARNING "WLAN: Nobody to notify\n");
 		return -EAGAIN;
 	}
-	if (true == val) {
-		fxi_c210_wlan_setup_power(true);
-		wifi_status_cb(&s3c_device_hsmmc3, 1);
-	} else {
-		fxi_c210_wlan_setup_power(false);
-		wifi_status_cb(&s3c_device_hsmmc3, 0);
-	}
+	wifi_status_cb(&s3c_device_hsmmc0, val);
 
 	return 0;
 }
 
-struct ath6kl_platform_data fxi_c210_wlan_data  __initdata = {
-	.setup_power = fxi_c210_wifi_set_detect,
-};
+void bcm_wlan_power_on(int flag)
+{
+	if (flag == 1) {
+		printk(KERN_DEBUG "[WIFI] Enabling device\n");
+		fxi_c210_wifi_set_detect(true);
+	} else {
+		printk(KERN_DEBUG "%s: flag=%d - skip\n", __FUNCTION__, flag);
+	}
+}
+EXPORT_SYMBOL(bcm_wlan_power_on);
+
+void bcm_wlan_power_off(int flag)
+{
+	if (flag == 1) {
+		printk(KERN_DEBUG "[WIFI] Disabling device\n");
+		fxi_c210_wifi_set_detect(false);
+	} else {
+		printk(KERN_DEBUG "%s: flag=%d - skip\n", __FUNCTION__, flag);
+	}
+}	
+EXPORT_SYMBOL(bcm_wlan_power_off);
 
 
 /* USB EHCI */
@@ -693,7 +717,6 @@ static struct platform_device fxi_c210_device_gpiokeys = {
 static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
 {
 	int ret;
-<<<<<<< HEAD
 
 	if (power)
 		ret = gpio_request_one(EXYNOS4_GPE3(4),
@@ -708,22 +731,6 @@ static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
 		pr_err("failed to request gpio for LCD power: %d\n", ret);
 }
 
-=======
-
-	if (power)
-		ret = gpio_request_one(EXYNOS4_GPE3(4),
-					GPIOF_OUT_INIT_HIGH, "GPE3_4");
-	else
-		ret = gpio_request_one(EXYNOS4_GPE3(4),
-					GPIOF_OUT_INIT_LOW, "GPE3_4");
-
-	gpio_free(EXYNOS4_GPE3(4));
-
-	if (ret)
-		pr_err("failed to request gpio for LCD power: %d\n", ret);
-}
-
->>>>>>> parent of a9b1745... Removes dead code from FXI C210 machine file.
 static struct plat_lcd_data fxi_c210_lcd_hv070wsa_data = {
 	.set_power = lcd_hv070wsa_set_power,
 	.min_uV		= 3300000,
@@ -986,8 +993,6 @@ static void __init fxi_c210_machine_init(void)
 	samsung_bl_set(&fxi_c210_bl_gpio_info, &fxi_c210_bl_data);
 
 //	fxi_c210_bt_setup();
-
-//	ath6kl_set_platform_data(&fxi_c210_wlan_data);
 }
 
 MACHINE_START(FXI_C210, "FXI_C210")
