@@ -25,6 +25,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
 #include <linux/gpio.h>
+#include <linux/mmc/host.h>
 #include <linux/interrupt.h>
 
 #include <asm/hardware/vic.h>
@@ -280,6 +281,9 @@ static void __init goni_tsp_init(void)
 	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
 	i2c2_devs[0].irq = gpio_to_irq(gpio);
 }
+
+/* USB OTG */
+static struct s3c_hsotg_plat goni_hsotg_pdata;
 
 static void goni_camera_init(void)
 {
@@ -769,6 +773,7 @@ static void __init goni_pmic_init(void)
 /* MoviNAND */
 static struct s3c_sdhci_platdata goni_hsmmc0_data __initdata = {
 	.max_width		= 4,
+	.host_caps2		= MMC_CAP2_BROKEN_VOLTAGE,
 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
 };
 
@@ -942,6 +947,8 @@ static void __init goni_machine_init(void)
 	/* FIMC */
 	s3c_set_platdata(&goni_fimc_md_platdata, sizeof(goni_fimc_md_platdata),
 			 &s5p_device_fimc_md);
+
+	s3c_hsotg_set_platdata(&goni_hsotg_pdata);
 
 	goni_camera_init();
 

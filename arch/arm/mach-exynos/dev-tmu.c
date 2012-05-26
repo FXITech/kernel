@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-exynos4/dev-tmu.c
+/* linux/arch/arm/mach-exynos/dev-tmu.c
  *
  * Copyright 2011 by SAMSUNG
  *
@@ -25,8 +25,8 @@ static struct resource exynos4_tmu_resource[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= IRQ_TMU_TRIG0,
-		.end	= IRQ_TMU_TRIG0,
+		.start	= EXYNOS4_IRQ_TMU_TRIG0,
+		.end	= EXYNOS4_IRQ_TMU_TRIG0,
 		.flags	= IORESOURCE_IRQ,
 	},
 };

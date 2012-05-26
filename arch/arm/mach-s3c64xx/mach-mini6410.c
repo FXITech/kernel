@@ -203,6 +203,37 @@ static struct s3c_fb_platdata mini6410_lcd_pdata[] __initdata = {
 		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
 		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
 	},
+	.max_bpp	= 32,
+	.default_bpp	= 16,
+};
+
+static struct s3c_fb_pd_win mini6410_lcd_type1_fb_win = {
+	.win_mode	= {	/* 7.0" 800x480 */
+		.left_margin	= 8,
+		.right_margin	= 13,
+		.upper_margin	= 7,
+		.lower_margin	= 5,
+		.hsync_len	= 3,
+		.vsync_len	= 1,
+		.xres		= 800,
+		.yres		= 480,
+	},
+	.max_bpp	= 32,
+	.default_bpp	= 16,
+};
+
+static struct s3c_fb_platdata mini6410_lcd_pdata[] __initdata = {
+	{
+		.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
+		.win[0]		= &mini6410_lcd_type0_fb_win,
+		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+	}, {
+		.setup_gpio	= s3c64xx_fb_gpio_setup_24bpp,
+		.win[0]		= &mini6410_lcd_type1_fb_win,
+		.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
+		.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC,
+	},
 	{ },
 };
 

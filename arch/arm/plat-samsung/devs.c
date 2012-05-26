@@ -302,11 +302,7 @@ struct platform_device s5p_device_g2d = {
 
 #ifdef CONFIG_S5P_DEV_G3D
 static struct resource s5p_g3d_resource[] = {
-	[0] = {
-		.start	= S5P_PA_G3D,
-		.end	= S5P_PA_G3D + SZ_256K - 1,
-		.flags	= IORESOURCE_MEM,
-	},
+	[0] = DEFINE_RES_MEM(S5P_PA_G3D, SZ_256K),
 };
 
 struct platform_device s5p_device_g3d = {

@@ -340,7 +340,7 @@ static int exynos4_register_thermal(struct thermal_sensor_conf *sensor_conf)
 	count = 0;
 	th_zone->cool_dev[count] = cpufreq_cooling_register(
 			(struct freq_clip_table *)&(tab_ptr[count]),
-			tab_size, cpumask_of(0));
+			tab_size, cpumask_of(0), THERMAL_TRIP_STATE_INSTANCE);
 
 	if (IS_ERR(th_zone->cool_dev[count])) {
 		pr_err("Failed to register cpufreq cooling device\n");

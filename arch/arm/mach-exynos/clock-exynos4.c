@@ -121,27 +121,27 @@ static struct clk dummy_apb_pclk = {
 };
 
 static struct clk exynos4_clk_xxti = {
-    .name   = "xxti",
+	.name		= "xxti",
 };
 
 static struct clk exynos4_clk_audiocdclk0 = {
-    .name   = "audiocdclk",
-    .id = 0,
+	.name		= "audiocdclk",
+	.id		= 0,
 };
 
 static struct clk exynos4_clk_audiocdclk1 = {
-    .name   = "audiocdclk",
-    .id = 0,
+	.name		= "audiocdclk",
+	.id		= 0,
 };
 
 static struct clk exynos4_clk_audiocdclk2 = {
-    .name   = "audiocdclk",
-    .id = -1,
+	.name		= "audiocdclk",
+	.id		= -1,
 };
 
 static struct clk exynos4_clk_spdifcdclk = {
-    .name   = "spdifcdclk",
-    .id = -1,
+	.name		= "spdifcdclk",
+	.id		= -1,
 };
 
 static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
@@ -902,13 +902,14 @@ static struct clksrc_sources exynos4_clkset_mout_audss = {
 	.nr_sources	= ARRAY_SIZE(exynos4_clkset_mout_audss_list),
 };
 
-static struct clksrc_clk clk_mout_audss = {
+static struct clksrc_clk exynos4_clk_mout_audss = {
 	.clk		= {
 		.name		= "busclk",
 	},
 	.sources	= &exynos4_clkset_mout_audss,
 	.reg_src	= { .reg = EXYNOS4_CLKSRC_AUDSS, .shift = 0, .size = 1 },
 };
+
 static struct clk *exynos4_clkset_sclk_audio0_list[] = {
        [0] = &exynos4_clk_audiocdclk0,
        [1] = NULL,
@@ -1659,7 +1660,7 @@ static struct clksrc_clk *exynos4_sysclks[] = {
 	&exynos4_clk_aclk_100,
 	&exynos4_clk_aclk_160,
 	&exynos4_clk_aclk_133,
-	&clk_mout_audss,
+	&exynos4_clk_mout_audss,
 	&exynos4_clk_dout_mmc0,
 	&exynos4_clk_dout_mmc1,
 	&exynos4_clk_dout_mmc2,
@@ -1932,7 +1933,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 
 	clk_fout_epll.enable = s5p_epll_enable;
 	clk_fout_epll.ops = &exynos4_epll_ops;
-	clk_set_parent(&clk_mout_audss.clk, &clk_fout_epll);
+	clk_set_parent(&exynos4_clk_mout_audss.clk, &clk_fout_epll);
 
 	printk(KERN_INFO "EXYNOS4: PLL settings, A=%ld, M=%ld, E=%ld V=%ld",
 			apll, mpll, epll, vpll);

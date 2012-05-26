@@ -1062,7 +1062,7 @@ static int s3c_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		ret = s3c_fb_wait_for_vsync(sfb, crtc);
 		break;
 	case S3CFB_WIN_SET_PIXEL_ALPHA:
-		s3cfb_set_alpha_blending(sfb, win->index);
+		ret = s3cfb_set_alpha_blending(sfb, win->index);
 		break;
 	default:
 		ret = -ENOTTY;
@@ -1406,7 +1406,7 @@ static void s3c_fb_clear_win(struct s3c_fb *sfb, int win)
 	writel(reg & ~SHADOWCON_WINx_PROTECT(win), regs + SHADOWCON);
 }
 
-#if 0
+#ifdef CONFIG_OF
 static int s3c_fb_dt_parse_gpios(struct device *dev, struct s3c_fb *sfb,
 						bool request)
 {
@@ -1608,6 +1608,7 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 		dev_err(dev, "too many windows, cannot attach\n");
 		return -EINVAL;
 	}
+
 #if 0
 	if (pdev->dev.of_node) {
 		pd = s3c_fb_dt_parse_pdata(&pdev->dev);
@@ -1615,6 +1616,7 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 			return PTR_ERR(pd);
 	}
 #endif
+
 	if (!pd) {
 		dev_err(dev, "no platform data specified\n");
 		return -EINVAL;

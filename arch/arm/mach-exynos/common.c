@@ -372,6 +372,11 @@ static void __init exynos5_map_io(void)
 	s3c_device_i2c0.resource[1].start = EXYNOS5_IRQ_IIC;
 	s3c_device_i2c0.resource[1].end   = EXYNOS5_IRQ_IIC;
 
+	s3c_sdhci_setname(0, "exynos4-sdhci");
+	s3c_sdhci_setname(1, "exynos4-sdhci");
+	s3c_sdhci_setname(2, "exynos4-sdhci");
+	s3c_sdhci_setname(3, "exynos4-sdhci");
+
 	/* The I2C bus controllers are directly compatible with s3c2440 */
 	s3c_i2c0_setname("s3c2440-i2c");
 	s3c_i2c1_setname("s3c2440-i2c");
@@ -639,9 +644,14 @@ void __init exynos4_init_irq(void)
 
 void __init exynos5_init_irq(void)
 {
+	int irq;
 	struct device_node *np;
 
-	gic_init(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
+#ifdef CONFIG_OF
+	of_irq_init(exynos4_dt_irq_match);
+#endif
+
+	combiner_init(S5P_VA_COMBINER_BASE, NULL);
 
 	/*
 	 * The Exynos5 wakeup interrupt controller has two-interrupt parents,

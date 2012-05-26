@@ -548,13 +548,11 @@ static int vb2_fb_open(struct fb_info *info, int user)
 	/*
          * Start emulation
          */
-        if (data->blank) {
-                ret = vb2_fb_start(info);
-                if (ret == 0)
-                        data->blank = 0;
-        }
-
-
+	if (data->blank) {
+		ret = vb2_fb_start(info);
+		if (ret == 0)
+			data->blank = 0;
+	}
 
 	return ret;
 }

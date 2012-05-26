@@ -985,7 +985,6 @@ grow_dev_page(struct block_device *bdev, sector_t block,
 	return page;
 
 failed:
-	BUG();
 	unlock_page(page);
 	page_cache_release(page);
 	return NULL;
@@ -2888,6 +2887,9 @@ int submit_bh(int rw, struct buffer_head * bh)
 	 */
 	if (test_set_buffer_req(bh) && (rw & WRITE))
 		clear_buffer_write_io_error(bh);
+
+	if (buffer_meta(bh))
+		rw |= REQ_META;
 
 	/*
 	 * from here on down, it's all bio -- do the initial mapping,

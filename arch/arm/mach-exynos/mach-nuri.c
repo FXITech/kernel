@@ -53,6 +53,7 @@
 #include <plat/fimc-core.h>
 #include <plat/camport.h>
 #include <plat/mipi_csis.h>
+#include <plat/udc-hs.h>
 
 #include <mach/map.h>
 
@@ -113,6 +114,7 @@ static struct s3c_sdhci_platdata nuri_hsmmc0_data __initdata = {
 	.host_caps		= (MMC_CAP_8_BIT_DATA | MMC_CAP_4_BIT_DATA |
 				MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED |
 				MMC_CAP_ERASE),
+	.host_caps2		= MMC_CAP2_BROKEN_VOLTAGE,
 	.cd_type		= S3C_SDHCI_CD_PERMANENT,
 };
 
@@ -824,6 +826,7 @@ static struct regulator_init_data __initdata max8997_esafeout1_data = {
 	.constraints	= {
 		.name		= "SAFEOUT1",
 		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
+		.always_on	= 1,
 		.state_mem	= {
 			.disabled	= 1,
 		},
@@ -1341,6 +1344,7 @@ static void __init nuri_machine_init(void)
 	nuri_camera_init();
 
 	nuri_ehci_init();
+	s3c_hsotg_set_platdata(&nuri_hsotg_pdata);
 
 	s3c_hsotg_set_platdata(&nuri_hsotg_pdata);
 	clk_xusbxti.rate = 24000000;

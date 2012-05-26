@@ -1188,6 +1188,15 @@ if !MMU
 source "arch/arm/Kconfig-nommu"
 endif
 
+config ARM_ERRATA_326103
+	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
+	depends on CPU_V6
+	help
+	  Executing a SWP instruction to read-only memory does not set bit 11
+	  of the FSR on the ARM 1136 prior to r1p0. This causes the kernel to
+	  treat the access as a read, preventing a COW from occurring and
+	  causing the faulting task to livelock.
+
 config ARM_ERRATA_411920
 	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
 	depends on CPU_V6 || CPU_V6K
@@ -1981,6 +1990,17 @@ config ARM_APPENDED_DTB
 	  if you don't intend to always append a DTB.  Proper passing of the
 	  location into r2 of a bootloader provided DTB is always preferable
 	  to this option.
+
+config ARM_APPENDED_DTB_FILE
+	string "DTB file"
+	depends on ARM_APPENDED_DTB
+	default ""
+	help
+	  This gives the name of file from the build directory to append
+	  to the zImage after it has been built.
+
+	  If you are not sure, leave it blank.
+
 
 config ARM_ATAG_DTB_COMPAT
 	bool "Supplement the appended DTB with traditional ATAG information"

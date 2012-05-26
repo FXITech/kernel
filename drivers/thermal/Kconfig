@@ -19,14 +19,6 @@ config THERMAL_HWMON
 	depends on HWMON=y || HWMON=THERMAL
 	default y
 
-config SPEAR_THERMAL
-	bool "SPEAr thermal sensor driver"
-	depends on THERMAL
-	depends on PLAT_SPEAR
-	help
-	  Enable this to plug the SPEAr thermal sensor driver into the Linux
-	  thermal framework
-
 config CPU_THERMAL
 	bool "generic cpu cooling support"
 	depends on THERMAL && CPU_FREQ && HOTPLUG_CPU
@@ -38,12 +30,25 @@ config CPU_THERMAL
 	  and not the ACPI interface.
 	  If you want this support, you should say Y or M here.
 
+config IMX6Q_THERMAL
+	bool "IMX6Q Thermal interface support"
+	depends on THERMAL && CPU_THERMAL
+	help
+	  Adds thermal management for IMX6Q.
+	  
+config SPEAR_THERMAL
+	bool "SPEAr thermal sensor driver"
+	depends on THERMAL
+	depends on PLAT_SPEAR
+	help
+	  Enable this to plug the SPEAr thermal sensor driver into the Linux
+	  thermal framework
+
 config SENSORS_EXYNOS4_TMU
 	tristate "Temperature sensor on Samsung EXYNOS4"
 	depends on ARCH_EXYNOS4 && THERMAL
 	help
 	  If you say yes here you get support for TMU (Thermal Managment
 	  Unit) on SAMSUNG EXYNOS4 series of SoC.
-
 	  This driver can also be built as a module. If so, the module
-	  will be called exynos4-tmu.
+	  will be called exynos4-tmu

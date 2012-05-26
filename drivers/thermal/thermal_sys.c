@@ -1156,6 +1156,7 @@ struct thermal_zone_device *thermal_zone_device_register(char *type,
 	int result;
 	int count;
 	int passive = 0;
+	long first_trip_temp, trip_temp;
 
 	if (strlen(type) >= THERMAL_NAME_LENGTH)
 		return ERR_PTR(-EINVAL);
@@ -1214,6 +1215,7 @@ struct thermal_zone_device *thermal_zone_device_register(char *type,
 			goto unregister;
 	}
 
+	first_trip_temp = 0;
 	for (count = 0; count < trips; count++) {
 		result = device_create_file(&tz->device,
 					    &trip_point_attrs[count * 2]);
@@ -1226,6 +1228,21 @@ struct thermal_zone_device *thermal_zone_device_register(char *type,
 		tz->ops->get_trip_type(tz, count, &trip_type);
 		if (trip_type == THERMAL_TRIP_PASSIVE)
 			passive = 1;
+		/*
+		 * For THERMAL_TRIP_STATE_INSTANCE trips, thermal zone should
+		 * be in ascending order.
+		*/
+		if (trip_type == THERMAL_TRIP_STATE_INSTANCE) {
+			tz->ops->get_trip_temp(tz, count, &trip_temp);
+			if (first_trip_temp == 0)
+				first_trip_temp = trip_temp;
+			else if (first_trip_temp < trip_temp)
+				first_trip_temp = trip_temp;
+			else if (first_trip_temp > trip_temp) {
+				pr_warn("Zone trip points should be in ascending order\n");
+				goto unregister;
+			}
+		}
 	}
 
 	if (!passive)
