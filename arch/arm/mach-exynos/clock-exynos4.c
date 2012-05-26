@@ -1001,7 +1001,7 @@ static struct clksrc_clk exynos4_clk_sclk_audio2 = {
 };
 
 static struct clk *clkset_sclk_audss_list[] = {
-       &clk_mout_audss.clk,
+       &exynos4_clk_mout_audss.clk,
        &exynos4_clk_audiocdclk0,
        &exynos4_clk_sclk_audio0.clk,
 };
@@ -1955,9 +1955,9 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 	clk_h.rate = sclk_dmc;
 	clk_p.rate = aclk_100;
 
-    clk_set_parent(&clk_sclk_audss.clk, &clk_mout_audss.clk);
-    clk_set_parent(&clk_mout_audss.clk, &clk_fout_epll);
-    clk_set_parent(&exynos4_clk_sclk_audio0.clk, &exynos4_clk_mout_epll.clk);
+	clk_set_parent(&clk_sclk_audss.clk, &exynos4_clk_mout_audss.clk);
+	clk_set_parent(&exynos4_clk_mout_audss.clk, &clk_fout_epll);
+	clk_set_parent(&exynos4_clk_sclk_audio0.clk, &exynos4_clk_mout_epll.clk);
 	for (ptr = 0; ptr < ARRAY_SIZE(exynos4_clksrcs); ptr++)
 		s3c_set_clksrc(&exynos4_clksrcs[ptr], true);
 }

@@ -158,7 +158,6 @@
 #define HDMI_MODE_DVI_EN		(1 << 0)
 #define HDMI_MODE_MASK			(3 << 0)
 
-<<<<<<< HEAD
 /* HDMI SPDIF registers */
 #define HDMI_SPDIF_CLK_CTRL		HDMI_SPDIF_BASE(0x0000)
 #define HDMI_SPDIF_OP_CTRL		HDMI_SPDIF_BASE(0x0004)
