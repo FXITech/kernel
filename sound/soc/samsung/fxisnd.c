@@ -135,7 +135,7 @@ static struct snd_soc_dai_link fxi_dai[] = {
         .stream_name = "FXI Playback",
         .platform_name = "samsung-audio",
         .cpu_dai_name = "samsung-i2s.0",
-        .codec_dai_name = "dit-hifi",
+        .codec_dai_name = "samsung-spdif",
         .codec_name = "spdif-dit",
         .ops = &fxi_ops,
     },
