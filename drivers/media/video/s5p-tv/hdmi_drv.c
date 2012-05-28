@@ -285,6 +285,7 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	hdmi_set_acr(sample_rate, acr);
 	hdmi_reg_acr(hdev, acr);
 
+
 	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
 			| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
 			| HDMI_I2S_MUX_ENABLE);
@@ -301,7 +302,6 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 
 	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
 	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
-
 	val = hdmi_read(hdev, HDMI_I2S_DSD_CON) | 0x01;
 	hdmi_writeb(hdev, HDMI_I2S_DSD_CON, val);
 
@@ -339,6 +339,7 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 			| HDMI_I2S_WORD_LEN_MAX_24BITS);
 
 	hdmi_writeb(hdev, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
+
 }
 
 static void hdmi_audio_control(struct hdmi_device *hdev, bool onoff)
@@ -350,7 +351,7 @@ static void hdmi_audio_control(struct hdmi_device *hdev, bool onoff)
 		return;
 
 	hdmi_writeb(hdev, HDMI_AUI_CON, onoff ? 2 : 0);
-	hdmi_write_mask(hdev, HDMI_CON_0, onoff ?
+	hdmi_write_mask(hdev, HDMI_CON_0, onoff ? \
 			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
 }
 
