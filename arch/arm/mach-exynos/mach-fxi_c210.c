@@ -859,9 +859,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_hsmmc3,
 	&s3c_device_i2c0,
 	&s3c_device_i2c1,
-
-  &fxifb_device,
-
+	&fxifb_device,
 	&s3c_device_rtc,
 	&s3c_device_wdt,
 	&s3c_device_usb_hsotg,
@@ -891,13 +889,13 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&exynos4_device_pcm1,
 	&exynos4_device_pcm2,
 	&exynos4_device_ac97,
-  &exynos4_device_spdif,
-  &exynos4_device_i2s0,
-  &fxi_spdif,
+	&exynos4_device_spdif,
+	&exynos4_device_i2s0,
+	&fxi_spdif,
   	&btbutton_device_gpiokeys,
   	&fxi_sysfs,
   	&fxi_fxiid,
-    &fxi_mali,
+	&fxi_mali,
 };
 
 /* LCD Backlight data */
