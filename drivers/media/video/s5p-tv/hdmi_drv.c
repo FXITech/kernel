@@ -316,6 +316,9 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 
    	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, 0x0); // Clear
    	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, HDMI_SPDIF_CLK_CTRL_ENABLE);
+   	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x01); // check
+   	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x03); // Run
+
 /*
 	From reference code hdmi_audio.c these exists here
 	HDMI_OP_CTRL(OP_CTRL_CHECK);
