@@ -135,6 +135,7 @@ static int fxi_hw_params(struct snd_pcm_substream *substream,
         return ret;
 
     /* Set S/PDIF uses internal source clock */
+    printk(KERN_DEBUG "%s - rclk_rate = %d\n", __func__, rclk_rate);
     ret = snd_soc_dai_set_sysclk(cpu_dai, SND_SOC_SPDIF_INT_MCLK,
                     rclk_rate, SND_SOC_CLOCK_IN);
     if (ret < 0)
@@ -152,7 +153,7 @@ static struct snd_soc_dai_link fxi_dai[] = {
         .name = "FXI Sound",
         .stream_name = "FXI Playback",
         .platform_name = "samsung-audio",
-        .cpu_dai_name = "samsung-i2s.0",
+        .cpu_dai_name = "samsung-spdif",
         .codec_dai_name = "dit-hifi",
         .codec_name = "spdif-dit",
         .ops = &fxi_ops,
