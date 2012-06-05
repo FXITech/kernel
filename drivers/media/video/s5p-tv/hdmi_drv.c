@@ -258,11 +258,14 @@ static void hdmi_reg_acr(struct hdmi_device *hdev, u8 *acr)
 
 static void hdmi_audio_init(struct hdmi_device *hdev)
 {
-	u32 sample_rate, bits_per_sample, frame_size_code;
+	u32 sample_rate, bits_per_sample, frame_size_code, repcnt, wl, valuen, cts;
 	u32 data_num, bit_ch, sample_frq;
 	u8 acr[7];
 
 	sample_rate = 44100;
+	valuen = 6272;
+	cts = 30000;
+
 	bits_per_sample = 16;
 	frame_size_code = 0;
 
@@ -285,7 +288,70 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	hdmi_set_acr(sample_rate, acr);
 	hdmi_reg_acr(hdev, acr);
 
+	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
+	hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_1,
+            HDMI_SPDIF_CONFIG_1_FILTER_M |
+            HDMI_SPDIF_CONFIG_1_PCPD_M |
+            HDMI_SPDIF_CONFIG_1_WORD_LENGHT_M |
+            HDMI_SPDIF_CONFIG_1_UVCP_REPORT |
+            HDMI_SPDIF_CONFIG_1_BURST_SIZE_2 |
+            HDMI_SPDIF_CONFIG_1_DATA_ALIGN_32BIT);
 
+	hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_2,
+            HDMI_SPDIF_CONFIG_2_NO_CLK_DIV);
+
+	repcnt = 0; // PCM
+	wl = 11; // 24 bit
+
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_1,  ((repcnt&0xf)<<4)|wl);
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_2, (repcnt>>4)&0xff);
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_3, frame_size_code&0xff);
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_4, (frame_size_code>>8)&0xff);
+
+    hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_ENABLE
+            | HDMI_I2S_AUD_SPDIF | HDMI_I2S_MUX_ENABLE);
+
+   	hdmi_writeb(hdev, HDMI_I2S_MUX_CH, 0xff); // Enable all channels
+   	hdmi_writeb(hdev, HDMI_I2S_MUX_CUV, 0x03); // Enable left and right CUV
+
+   	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, 0x0); // Clear
+   	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, HDMI_SPDIF_CLK_CTRL_ENABLE);
+   	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x01); // check
+   	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x03); // Run
+
+/*
+	From reference code hdmi_audio.c these exists here
+	HDMI_OP_CTRL(OP_CTRL_CHECK);
+	HDMI_OP_CTRL(OP_CTRL_RUN);
+*/
+
+   	hdmi_writeb(hdev, HDMI_ASP_CON, HDMI_ASP_AUDIO_SAMPLE_PACKET
+   		| HDMI_ASP_TWO_CHANNEL_MODE | HDMI_ASP_AUDIO_0_ENABLE);
+
+
+   	hdmi_writeb(hdev, HDMI_ASP_SP_FLAT, 0x0);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_0, 0x08);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_1, 0x1a);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_2, 0x2c);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_3, 0x3e);
+
+   	hdmi_writeb(hdev, HDMI_ACR_N_0, valuen & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_N_1, (valuen>>8) & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_N_2, (valuen>>16) & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_CTS_0, cts & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_CTS_1, (cts>>8) & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_CTS_2, (cts>>16) & 0xff);
+
+   	hdmi_writeb(hdev, HDMI_ACR_CON, 4); // This value from reference code is marked as 'measured'
+   	
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_1, 0x00); // The CT &CC Bits shall always be set to a value of 0 ("Refer to Stream Header")
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_2, 0x00); // The SF Bits shall always be set to a value of 0 ("Refer to Stream Header")
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_3, 0x00); // This sfr shall always be set to a value of 0 ("Refer to Stream Header")
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_4, 0x00); // 2ch pcm or Stream
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_5, 0x00); // 2ch pcm or Stream
+
+
+#if 0
     hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
             | HDMI_I2S_AUD_SPDIF | HDMI_I2S_CUV_I2S_ENABLE
             | HDMI_I2S_MUX_ENABLE);
@@ -334,7 +400,7 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	hdmi_writeb(hdev, HDMI_I2S_CH_ST_2, 0x0);
 	hdmi_writeb(hdev, HDMI_I2S_CH_ST_3, 0x0);
 	hdmi_writeb(hdev, HDMI_I2S_CH_ST_4, 0x0);
-
+#endif
 
 }
 
