@@ -26,6 +26,7 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 	struct dma_slave_config slave_config;
 	void *filter_param;
 
+	printk(KERN_DEBUG "%s - dma_ch = %d\n", __func__, dma_ch);
 	dma_cap_zero(mask);
 	dma_cap_set(info->cap, mask);
 
@@ -39,11 +40,8 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 	 	chan = dma_request_channel(mask, pl330_filter, filter_param);
 	 } else {
 	 	printk(KERN_DEBUG "dmadev: using dma_ch");
-	 	chan = dma_request_channel(mask, pl330_filter, NULL);
+	 	chan = dma_request_channel(mask, pl330_filter, (void *)dma_ch);
 	 }
-
-	
-	printk(KERN_DEBUG "dmadev: chan = %p\n", chan);
 
 	if (info->direction == DMA_DEV_TO_MEM) {
 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
@@ -51,7 +49,6 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 		slave_config.src_addr = info->fifo;
 		slave_config.src_addr_width = info->width;
 		slave_config.src_maxburst = 1;
-		printk(KERN_DEBUG "dmadev 1\n");
 		dmaengine_slave_config(chan, &slave_config);
 	} else if (info->direction == DMA_MEM_TO_DEV) {
 		memset(&slave_config, 0, sizeof(struct dma_slave_config));
@@ -59,7 +56,6 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 		slave_config.dst_addr = info->fifo;
 		slave_config.dst_addr_width = info->width;
 		slave_config.dst_maxburst = 1;
-		printk(KERN_DEBUG "dmadev 2dt\n");
 		printk(KERN_DEBUG "dmadev: dst_addr: %x\n", (unsigned int)slave_config.dst_addr);
 		dmaengine_slave_config(chan, &slave_config);
 	}
