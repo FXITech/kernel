@@ -246,9 +246,9 @@ static void hdmi_reg_acr(struct hdmi_device *hdev, u8 *acr)
 	hdmi_writeb(hdev, HDMI_ACR_N0, acr[6]);
 	hdmi_writeb(hdev, HDMI_ACR_N1, acr[5]);
 	hdmi_writeb(hdev, HDMI_ACR_N2, acr[4]);
-	hdmi_writeb(hdev, HDMI_ACR_MCTS0, acr[3]);
-	hdmi_writeb(hdev, HDMI_ACR_MCTS1, acr[2]);
-	hdmi_writeb(hdev, HDMI_ACR_MCTS2, acr[1]);
+	hdmi_writeb(hdev, HDMI_ACR_MCTS0, 0x45);
+	hdmi_writeb(hdev, HDMI_ACR_MCTS1, 0x42);
+	hdmi_writeb(hdev, HDMI_ACR_MCTS2, 0x1);
 	hdmi_writeb(hdev, HDMI_ACR_CTS0, acr[3]);
 	hdmi_writeb(hdev, HDMI_ACR_CTS1, acr[2]);
 	hdmi_writeb(hdev, HDMI_ACR_CTS2, acr[1]);
@@ -258,12 +258,14 @@ static void hdmi_reg_acr(struct hdmi_device *hdev, u8 *acr)
 
 static void hdmi_audio_init(struct hdmi_device *hdev)
 {
-	u32 sample_rate, bits_per_sample, frame_size_code;
+	u32 sample_rate, bits_per_sample, frame_size_code, repcnt, wl, valuen, cts;
 	u32 data_num, bit_ch, sample_frq;
-	u32 val;
 	u8 acr[7];
 
 	sample_rate = 44100;
+	valuen = 6272;
+	cts = 30000;
+
 	bits_per_sample = 16;
 	frame_size_code = 0;
 
@@ -282,63 +284,124 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 		break;
 	}
 
+	printk(KERN_DEBUG "%s - writing HDMI registers.\n", __func__);
 	hdmi_set_acr(sample_rate, acr);
 	hdmi_reg_acr(hdev, acr);
 
-	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
-			| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
-			| HDMI_I2S_MUX_ENABLE);
+	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
+	hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_1,
+            HDMI_SPDIF_CONFIG_1_FILTER_M |
+            HDMI_SPDIF_CONFIG_1_PCPD_M |
+            HDMI_SPDIF_CONFIG_1_WORD_LENGHT_M |
+            HDMI_SPDIF_CONFIG_1_UVCP_REPORT |
+            HDMI_SPDIF_CONFIG_1_BURST_SIZE_2 |
+            HDMI_SPDIF_CONFIG_1_DATA_ALIGN_32BIT);
 
-	hdmi_writeb(hdev, HDMI_I2S_MUX_CH, HDMI_I2S_CH0_EN
-			| HDMI_I2S_CH1_EN | HDMI_I2S_CH2_EN);
+	hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_2,
+            HDMI_SPDIF_CONFIG_2_NO_CLK_DIV);
 
+	repcnt = 0; // PCM
+	wl = 11; // 24 bit
+
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_1,  ((repcnt&0xf)<<4)|wl);
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_2, (repcnt>>4)&0xff);
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_3, frame_size_code&0xff);
+	hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_4, (frame_size_code>>8)&0xff);
+
+    hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_ENABLE
+            | HDMI_I2S_AUD_SPDIF | HDMI_I2S_MUX_ENABLE);
+
+   	hdmi_writeb(hdev, HDMI_I2S_MUX_CH, 0xff); // Enable all channels
+   	hdmi_writeb(hdev, HDMI_I2S_MUX_CUV, 0x03); // Enable left and right CUV
+
+   	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, 0x0); // Clear
+   	hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, HDMI_SPDIF_CLK_CTRL_ENABLE);
+   	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x01); // check
+   	hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x03); // Run
+
+/*
+	From reference code hdmi_audio.c these exists here
+	HDMI_OP_CTRL(OP_CTRL_CHECK);
+	HDMI_OP_CTRL(OP_CTRL_RUN);
+*/
+
+   	hdmi_writeb(hdev, HDMI_ASP_CON, HDMI_ASP_AUDIO_SAMPLE_PACKET
+   		| HDMI_ASP_TWO_CHANNEL_MODE | HDMI_ASP_AUDIO_0_ENABLE);
+
+
+   	hdmi_writeb(hdev, HDMI_ASP_SP_FLAT, 0x0);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_0, 0x08);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_1, 0x1a);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_2, 0x2c);
+   	hdmi_writeb(hdev, HDMI_ASP_CH_CFG_3, 0x3e);
+
+   	hdmi_writeb(hdev, HDMI_ACR_N_0, valuen & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_N_1, (valuen>>8) & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_N_2, (valuen>>16) & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_CTS_0, cts & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_CTS_1, (cts>>8) & 0xff);
+   	hdmi_writeb(hdev, HDMI_ACR_CTS_2, (cts>>16) & 0xff);
+
+   	hdmi_writeb(hdev, HDMI_ACR_CON, 4); // This value from reference code is marked as 'measured'
+   	
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_1, 0x00); // The CT &CC Bits shall always be set to a value of 0 ("Refer to Stream Header")
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_2, 0x00); // The SF Bits shall always be set to a value of 0 ("Refer to Stream Header")
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_3, 0x00); // This sfr shall always be set to a value of 0 ("Refer to Stream Header")
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_4, 0x00); // 2ch pcm or Stream
+   	hdmi_writeb(hdev, HDMI_AUI_DATA_5, 0x00); // 2ch pcm or Stream
+
+
+#if 0
+    hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
+            | HDMI_I2S_AUD_SPDIF | HDMI_I2S_CUV_I2S_ENABLE
+            | HDMI_I2S_MUX_ENABLE);
+
+	hdmi_writeb(hdev, HDMI_I2S_MUX_CH, 0xF7);
 	hdmi_writeb(hdev, HDMI_I2S_MUX_CUV, HDMI_I2S_CUV_RL_EN);
 
-	sample_frq = (sample_rate == 44100) ? 0 :
-		(sample_rate == 48000) ? 2 :
-		(sample_rate == 32000) ? 3 :
-		(sample_rate == 96000) ? 0xa : 0x0;
-
-	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_DIS);
 	hdmi_writeb(hdev, HDMI_I2S_CLK_CON, HDMI_I2S_CLK_EN);
+	hdmi_writeb(hdev, HDMI_I2S_DSD_CON, 0x02);
 
-	val = hdmi_read(hdev, HDMI_I2S_DSD_CON) | 0x01;
-	hdmi_writeb(hdev, HDMI_I2S_DSD_CON, val);
+    hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_1,
+            HDMI_SPDIF_CONFIG_1_FILTER_M |
+            HDMI_SPDIF_CONFIG_1_PCPD_M |
+            HDMI_SPDIF_CONFIG_1_WORD_LENGHT_M |
+            HDMI_SPDIF_CONFIG_1_UVCP_REPORT |
+            HDMI_SPDIF_CONFIG_1_BURST_SIZE_2 |
+            HDMI_SPDIF_CONFIG_1_DATA_ALIGN_32BIT);
 
-	/* Configuration I2S input ports. Configure I2S_PIN_SEL_0~4 */
-	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_0, HDMI_I2S_SEL_SCLK(5)
-			| HDMI_I2S_SEL_LRCK(6));
-	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_1, HDMI_I2S_SEL_SDATA1(3)
-			| HDMI_I2S_SEL_SDATA2(4));
-	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_2, HDMI_I2S_SEL_SDATA3(1)
-			| HDMI_I2S_SEL_SDATA2(2));
-	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_3, HDMI_I2S_SEL_DSD(0));
+    hdmi_writeb(hdev, HDMI_SPDIF_CONFIG_2,
+            HDMI_SPDIF_CONFIG_2_NO_CLK_DIV);
+
+    hdmi_writeb(hdev, HDMI_SPDIF_CLK_CTRL, 0x01);
+
+    hdmi_writeb(hdev, HDMI_SPDIF_OP_CTRL, 0x03);
+
+    hdmi_writeb(hdev, HDMI_SPDIF_USER_VALUE_1, HDMI_SPDIF_USER_VALUE1_WL_24BIT);
+    hdmi_writeb(hdev, HDMI_SPDIF_IRQ_MASK, HDMI_SPDIF_IRQ_OVERFLOW_ENABLE);
+
+    /* Set I2S_PIN_SEL_<0-3> */
+
+	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_0, 0x77);
+	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_1, 0x77);
+	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_2, 0x77);
+	hdmi_writeb(hdev, HDMI_I2S_PIN_SEL_3, 0x07);
 
 	/* I2S_CON_1 & 2 */
-	hdmi_writeb(hdev, HDMI_I2S_CON_1, HDMI_I2S_SCLK_FALLING_EDGE
-			| HDMI_I2S_L_CH_LOW_POL);
-	hdmi_writeb(hdev, HDMI_I2S_CON_2, HDMI_I2S_MSB_FIRST_MODE
-			| HDMI_I2S_SET_BIT_CH(bit_ch)
-			| HDMI_I2S_SET_SDATA_BIT(data_num)
-			| HDMI_I2S_BASIC_FORMAT);
+	hdmi_writeb(hdev, HDMI_I2S_CON_1, 0x00);
+	hdmi_writeb(hdev, HDMI_I2S_CON_2, 0x16);
 
-
+	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, 0x63);
 	/* Configure register related to CUV information */
-	hdmi_writeb(hdev, HDMI_I2S_CH_ST_0, HDMI_I2S_CH_STATUS_MODE_0
-			| HDMI_I2S_2AUD_CH_WITHOUT_PREEMPH
-			| HDMI_I2S_COPYRIGHT
-			| HDMI_I2S_LINEAR_PCM
-			| HDMI_I2S_CONSUMER_FORMAT);
-	hdmi_writeb(hdev, HDMI_I2S_CH_ST_1, HDMI_I2S_CD_PLAYER);
-	hdmi_writeb(hdev, HDMI_I2S_CH_ST_2, HDMI_I2S_SET_SOURCE_NUM(0));
-	hdmi_writeb(hdev, HDMI_I2S_CH_ST_3, HDMI_I2S_CLK_ACCUR_LEVEL_2
-			| HDMI_I2S_SET_SMP_FREQ(sample_frq));
-	hdmi_writeb(hdev, HDMI_I2S_CH_ST_4,
-			HDMI_I2S_ORG_SMP_FREQ_44_1
-			| HDMI_I2S_WORD_LEN_MAX24_24BITS
-			| HDMI_I2S_WORD_LEN_MAX_24BITS);
 
-	hdmi_writeb(hdev, HDMI_I2S_CH_ST_CON, HDMI_I2S_CH_STATUS_RELOAD);
+	hdmi_writeb(hdev, HDMI_I2S_CH_ST_CON, 0x0);
+	hdmi_writeb(hdev, HDMI_I2S_CH_ST_0, 0x0);
+	hdmi_writeb(hdev, HDMI_I2S_CH_ST_1, 0x0);
+	hdmi_writeb(hdev, HDMI_I2S_CH_ST_2, 0x0);
+	hdmi_writeb(hdev, HDMI_I2S_CH_ST_3, 0x0);
+	hdmi_writeb(hdev, HDMI_I2S_CH_ST_4, 0x0);
+#endif
+
 }
 
 static void hdmi_audio_control(struct hdmi_device *hdev, bool onoff)
@@ -350,7 +413,7 @@ static void hdmi_audio_control(struct hdmi_device *hdev, bool onoff)
 		return;
 
 	hdmi_writeb(hdev, HDMI_AUI_CON, onoff ? 2 : 0);
-	hdmi_write_mask(hdev, HDMI_CON_0, onoff ?
+	hdmi_write_mask(hdev, HDMI_CON_0, onoff ? \
 			HDMI_ASP_EN : HDMI_ASP_DIS, HDMI_ASP_MASK);
 }
 

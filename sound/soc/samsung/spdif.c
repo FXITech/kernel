@@ -110,12 +110,15 @@ static void spdif_snd_txctrl(struct samsung_spdif_info *spdif, int on)
 {
 	void __iomem *regs = spdif->regs;
 	u32 clkcon;
-
+	u32 tmp;
 	printk(KERN_DEBUG "Entered %s\n", __func__);
 
 	clkcon = readl(regs + CLKCON) & CLKCTL_MASK;
-	if (on)
+	if (on){
 		writel(clkcon | CLKCTL_PWR_ON, regs + CLKCON);
+		tmp = readl(regs+CLKCON);
+		printk(KERN_DEBUG "%s - set clkcon to : %02x\n", __func__, tmp);
+	}
 	else
 		writel(clkcon & ~CLKCTL_PWR_ON, regs + CLKCON);
 }
@@ -130,11 +133,16 @@ static int spdif_set_sysclk(struct snd_soc_dai *cpu_dai,
 
 	clkcon = readl(spdif->regs + CLKCON);
 
-	if (clk_id == SND_SOC_SPDIF_INT_MCLK)
+	if (clk_id == SND_SOC_SPDIF_INT_MCLK){
 		clkcon &= ~CLKCTL_MCLK_EXT;
-	else
+		printk(KERN_DEBUG "%s Set clock to Internal\n", __func__);
+	}
+	else{
 		clkcon |= CLKCTL_MCLK_EXT;
+		printk(KERN_DEBUG "%s Set clock to External\n", __func__);
 
+	}
+	printk(KERN_DEBUG "%s - setting CLKCON to : %02x", __func__, CLKCON);
 	writel(clkcon, spdif->regs + CLKCON);
 
 	spdif->clk_rate = freq;
@@ -194,6 +202,8 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK){
 		printk(KERN_DEBUG "%s - substream is SNDRV_PCM_STREAM_PLAYBACK\n", __func__);
 		dma_data = spdif->dma_playback;
+		printk(KERN_DEBUG "%s - DMA DEBUG: channel ID: %d\naddress: %02x\nsize: %d\nchannel: %02x\n",
+			__func__, dma_data->channel, dma_data->dma_addr, dma_data->dma_size, dma_data->ch);
 	}
 	else {
 		printk(KERN_DEBUG "Capture is not supported\n");
@@ -235,6 +245,7 @@ static int spdif_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	con &= ~CON_MCLKDIV_MASK;
+	printk(KERN_DEBUG "%s ratio: %d", __func__, ratio);
 	switch (ratio) {
 	case 256:
 		con |= CON_MCLKDIV_256FS;
@@ -438,7 +449,8 @@ static __devinit int spdif_probe(struct platform_device *pdev)
 	spdif_stereo_out.client = &spdif_dma_client_out;
 	spdif_stereo_out.dma_addr = mem_res->start + DATA_OUTBUF;
 	spdif_stereo_out.channel = dma_res->start;
-
+	printk(KERN_DEBUG "%s - spdif_stereo_out.dma_addr = %02x\nspdif_stereo_out.channel = %d\n",
+		__func__, spdif_stereo_out.dma_addr, spdif_stereo_out.channel);
 	spdif->dma_playback = &spdif_stereo_out;
 
 	return 0;

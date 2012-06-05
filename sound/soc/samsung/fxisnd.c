@@ -17,12 +17,69 @@
 #include <sound/soc-dapm.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-
+#include "spdif.h"
 #include "../../../sound/soc/samsung/i2s.h"
 
-static int set_epll_rate(unsigned long rate)
+static int set_audio_clock_heirachy(struct platform_device *pdev)
 {
-    struct clk *fout_epll;
+    struct clk *fout_epll, *mout_epll, *sclk_audio0, *sclk_spdif;
+    int ret = 0;
+
+    fout_epll = clk_get(NULL, "fout_epll");
+    if (IS_ERR(fout_epll)) {
+        printk(KERN_WARNING "%s: Cannot find fout_epll.\n",
+                __func__);
+        return -EINVAL;
+    }
+
+    mout_epll = clk_get(NULL, "mout_epll");
+    if (IS_ERR(mout_epll)) {
+        printk(KERN_WARNING "%s: Cannot find mout_epll.\n",
+                __func__);
+        ret = -EINVAL;
+        goto out1;
+    }
+
+    sclk_audio0 = clk_get(&pdev->dev, "sclk_audio");
+    if (IS_ERR(sclk_audio0)) {
+        printk(KERN_WARNING "%s: Cannot find sclk_audio.\n",
+                __func__);
+        ret = -EINVAL;
+        goto out2;
+    }
+
+    sclk_spdif = clk_get(NULL, "sclk_spdif");
+    if (IS_ERR(sclk_spdif)) {
+        printk(KERN_WARNING "%s: Cannot find sclk_spdif.\n",
+                __func__);
+        ret = -EINVAL;
+        goto out3;
+    }
+
+    /* Set audio clock hierarchy for S/PDIF */
+    clk_set_parent(mout_epll, fout_epll);
+    clk_set_parent(sclk_audio0, mout_epll);
+    clk_set_parent(sclk_spdif, sclk_audio0);
+
+    clk_put(sclk_spdif);
+out3:
+    clk_put(sclk_audio0);
+out2:
+    clk_put(mout_epll);
+out1:
+    clk_put(fout_epll);
+
+    return ret;
+}
+
+/* We should haved to set clock directly on this part because of clock
+ * scheme of Samsudng SoCs did not support to set rates from abstrct
+ * clock of it's hierarchy.
+ */
+static int set_audio_clock_rate(unsigned long epll_rate,
+                unsigned long audio_rate)
+{
+    struct clk *fout_epll, *sclk_spdif;
 
     fout_epll = clk_get(NULL, "fout_epll");
     if (IS_ERR(fout_epll)) {
@@ -30,99 +87,61 @@ static int set_epll_rate(unsigned long rate)
         return -ENOENT;
     }
 
-    if (rate == clk_get_rate(fout_epll))
-        goto out;
-
-    clk_set_rate(fout_epll, rate);
-out:
+    clk_set_rate(fout_epll, epll_rate);
     clk_put(fout_epll);
+
+    sclk_spdif = clk_get(NULL, "sclk_spdif");
+    if (IS_ERR(sclk_spdif)) {
+        printk(KERN_ERR "%s: failed to get sclk_spdif\n", __func__);
+        return -ENOENT;
+    }
+
+    clk_set_rate(sclk_spdif, audio_rate);
+    clk_put(sclk_spdif);
 
     return 0;
 }
 
 static int fxi_hw_params(struct snd_pcm_substream *substream,
-                struct snd_pcm_hw_params *params)
+        struct snd_pcm_hw_params *params)
 {
     struct snd_soc_pcm_runtime *rtd = substream->private_data;
     struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-    struct snd_soc_dai *codec_dai = rtd->codec_dai;
-    int bfs, psr, rfs, ret;
-    unsigned long rclk;
-    printk(KERN_DEBUG "Entered %s", __func__);
-
-    switch (params_format(params)) {
-    case SNDRV_PCM_FORMAT_U24:
-    case SNDRV_PCM_FORMAT_S24:
-        bfs = 48;
-        break;
-    case SNDRV_PCM_FORMAT_U16_LE:
-    case SNDRV_PCM_FORMAT_S16_LE:
-        bfs = 32;
-        break;
-    default:
-        printk(KERN_DEBUG "%s Invalid param format.", __func__ );
-        return -EINVAL;
-    }
+    unsigned long pll_out, rclk_rate;
+    int ret, ratio;
 
     switch (params_rate(params)) {
-    case 16000:
-    case 22050:
-    case 24000:
-    case 32000:
     case 44100:
+        pll_out = 45158400;
+        break;
+    case 32000:
     case 48000:
-    case 88200:
     case 96000:
-        rfs = (bfs == 48) ? 384 : 256;
-        break;
-    case 64000:
-        rfs = 384;
-        break;
-    case 8000:
-    case 11025:
-    case 12000:
-        rfs = (bfs == 48) ? 768 : 512;
+        pll_out = 49152000;
         break;
     default:
-    printk(KERN_DEBUG "%s Invalid param rate.", __func__ );
         return -EINVAL;
     }
 
-    rclk = params_rate(params) * rfs;
+    /* Setting ratio to 512fs helps to use S/PDIF with HDMI without
+     * modify S/PDIF ASoC machine driver.
+     */
+    ratio = 512;
+    rclk_rate = params_rate(params) * ratio;
 
-    switch (rclk) {
-    case 4096000:
-    case 5644800:
-    case 6144000:
-    case 8467200:
-    case 9216000:
-        psr = 8;
-        break;
-    case 8192000:
-    case 11289600:
-    case 12288000:
-    case 16934400:
-    case 18432000:
-        psr = 4;
-        break;
-    case 22579200:
-    case 24576000:
-    case 33868800:
-    case 36864000:
-        psr = 2;
-        break;
-    case 67737600:
-    case 73728000:
-        psr = 1;
-        break;
-    default:
-        printk(KERN_ERR "%s Not yet supported!\n", __func__);
-        return -EINVAL;
-    }
+    /* Set audio source clock rates */
+    ret = set_audio_clock_rate(pll_out, rclk_rate);
+    if (ret < 0)
+        return ret;
 
-    set_epll_rate(rclk * psr);
+    /* Set S/PDIF uses internal source clock */
+    printk(KERN_DEBUG "%s - rclk_rate = %d\n", __func__, rclk_rate);
+    ret = snd_soc_dai_set_sysclk(cpu_dai, SND_SOC_SPDIF_INT_MCLK,
+                    rclk_rate, SND_SOC_CLOCK_IN);
+    if (ret < 0)
+        return ret;
 
-    return 0;
+    return ret;
 }
 
 static struct snd_soc_ops fxi_ops = {
@@ -134,13 +153,15 @@ static struct snd_soc_dai_link fxi_dai[] = {
         .name = "FXI Sound",
         .stream_name = "FXI Playback",
         .platform_name = "samsung-audio",
-        .cpu_dai_name = "samsung-i2s.0",
+        .cpu_dai_name = "samsung-spdif",
         .codec_dai_name = "dit-hifi",
         .codec_name = "spdif-dit",
         .ops = &fxi_ops,
     },
 };
+/*
 
+*/
 static struct snd_soc_card fxisnd = {
     .name = "FXI-SND",
     .owner = THIS_MODULE,
@@ -168,6 +189,14 @@ static int __init fxi_audio_init(void)
     if (ret)
         goto err;
 
+    /* Set audio clock hierarchy manually */
+    ret = set_audio_clock_heirachy(fxi_snd_device);
+    if (ret)
+        goto err1;
+
+    return ret;
+err1:
+    platform_device_del(fxi_snd_device);
     return ret;
 err:
     platform_device_put(fxi_snd_device);
