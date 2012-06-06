@@ -290,7 +290,7 @@ static void hdmi_audio_init(struct hdmi_device *hdev)
 	hdmi_set_acr(sample_rate, acr);
 	hdmi_reg_acr(hdev, acr);
 
-	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_DISABLE
+	hdmi_writeb(hdev, HDMI_I2S_MUX_CON, HDMI_I2S_IN_ENABLE 
 			| HDMI_I2S_AUD_I2S | HDMI_I2S_CUV_I2S_ENABLE
 			| HDMI_I2S_MUX_ENABLE);
 
