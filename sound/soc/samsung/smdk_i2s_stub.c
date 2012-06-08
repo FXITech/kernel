@@ -18,6 +18,25 @@
 
 #include "i2s.h"
 
+static int set_epll_rate(unsigned long rate)
+{
+	struct clk *fout_epll;
+
+	fout_epll = clk_get(NULL, "fout_epll");
+	if (IS_ERR(fout_epll)) {
+		printk(KERN_ERR "%s: failed to get fout_epll\n", __func__);
+		return -ENOENT;
+	}
+
+	if (rate == clk_get_rate(fout_epll))
+		goto out;
+
+	clk_set_rate(fout_epll, rate);
+out:
+	clk_put(fout_epll);
+
+	return 0;
+}
 
 static int smdk_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *params)
@@ -96,6 +115,7 @@ static int smdk_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	set_epll_rate(rclk * psr);
 
 	/* Set the AP DAI configuration */
 	ret = snd_soc_dai_set_fmt(cpu_dai, SND_SOC_DAIFMT_I2S |
