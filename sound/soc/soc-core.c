@@ -755,10 +755,10 @@ int snd_soc_resume(struct device *dev)
 		ac97_control |= cpu_dai->driver->ac97_control;
 	}
 	if (ac97_control) {
-		printk(KERN_DEBUG "Resuming AC97 immediately\n");
+		dev_dbg(dev, "Resuming AC97 immediately\n");
 		soc_resume_deferred(&card->deferred_resume_work);
 	} else {
-		printk(KERN_DEBUG "Scheduling resume work\n");
+		dev_dbg(dev, "Scheduling resume work\n");
 		if (!schedule_work(&card->deferred_resume_work))
 			dev_err(dev, "resume work item may be lost\n");
 	}
@@ -3223,7 +3223,7 @@ int snd_soc_register_dai(struct device *dev,
 {
 	struct snd_soc_dai *dai;
 
-	printk(KERN_DEBUG "dai register %s\n", dev_name(dev));
+	dev_dbg(dev, "dai register %s\n", dev_name(dev));
 
 	dai = kzalloc(sizeof(struct snd_soc_dai), GFP_KERNEL);
 	if (dai == NULL)
@@ -3246,7 +3246,7 @@ int snd_soc_register_dai(struct device *dev,
 	snd_soc_instantiate_cards();
 	mutex_unlock(&client_mutex);
 
-	printk(KERN_DEBUG "Registered DAI '%s'\n", dai->name);
+	dev_dbg(dev, "Registered DAI '%s'\n", dai->name);
 
 	return 0;
 }
@@ -3272,7 +3272,7 @@ found:
 	list_del(&dai->list);
 	mutex_unlock(&client_mutex);
 
-	printk(KERN_DEBUG "Unregistered DAI '%s'\n", dai->name);
+	dev_dbg(dev, "Unregistered DAI '%s'\n", dai->name);
 	kfree(dai->name);
 	kfree(dai);
 }
@@ -3290,7 +3290,7 @@ int snd_soc_register_dais(struct device *dev,
 	struct snd_soc_dai *dai;
 	int i, ret = 0;
 
-	printk(KERN_DEBUG "dai register %s #%Zu\n", dev_name(dev), count);
+	dev_dbg(dev, "dai register %s #%Zu\n", dev_name(dev), count);
 
 	for (i = 0; i < count; i++) {
 
@@ -3321,7 +3321,7 @@ int snd_soc_register_dais(struct device *dev,
 		list_add(&dai->list, &dai_list);
 		mutex_unlock(&client_mutex);
 
-		printk(KERN_DEBUG "Registered DAI '%s'\n", dai->name);
+		dev_dbg(dev, "Registered DAI '%s'\n", dai->name);
 	}
 
 	mutex_lock(&client_mutex);
@@ -3362,7 +3362,7 @@ int snd_soc_register_platform(struct device *dev,
 {
 	struct snd_soc_platform *platform;
 
-	printk(KERN_DEBUG "platform register %s\n", dev_name(dev));
+	dev_dbg(dev, "platform register %s\n", dev_name(dev));
 
 	platform = kzalloc(sizeof(struct snd_soc_platform), GFP_KERNEL);
 	if (platform == NULL)
@@ -3387,7 +3387,7 @@ int snd_soc_register_platform(struct device *dev,
 	snd_soc_instantiate_cards();
 	mutex_unlock(&client_mutex);
 
-	printk(KERN_DEBUG "Registered platform '%s'\n", platform->name);
+	dev_dbg(dev, "Registered platform '%s'\n", platform->name);
 
 	return 0;
 }
@@ -3413,7 +3413,7 @@ found:
 	list_del(&platform->list);
 	mutex_unlock(&client_mutex);
 
-	printk(KERN_DEBUG "Unregistered platform '%s'\n", platform->name);
+	dev_dbg(dev, "Unregistered platform '%s'\n", platform->name);
 	kfree(platform->name);
 	kfree(platform);
 }
@@ -3466,7 +3466,7 @@ int snd_soc_register_codec(struct device *dev,
 	struct snd_soc_codec *codec;
 	int ret, i;
 
-	printk(KERN_DEBUG "codec register %s\n", dev_name(dev));
+	dev_dbg(dev, "codec register %s\n", dev_name(dev));
 
 	codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
 	if (codec == NULL)
@@ -3546,7 +3546,7 @@ int snd_soc_register_codec(struct device *dev,
 	snd_soc_instantiate_cards();
 	mutex_unlock(&client_mutex);
 
-	printk(KERN_DEBUG "Registered codec '%s'\n", codec->name);
+	dev_dbg(dev, "Registered codec '%s'\n", codec->name);
 	return 0;
 
 fail:
@@ -3583,7 +3583,7 @@ found:
 	list_del(&codec->list);
 	mutex_unlock(&client_mutex);
 
-	printk(KERN_DEBUG "Unregistered codec '%s'\n", codec->name);
+	dev_dbg(dev, "Unregistered codec '%s'\n", codec->name);
 
 	snd_soc_cache_exit(codec);
 	kfree(codec->reg_def_copy);

@@ -26,7 +26,6 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 	struct dma_slave_config slave_config;
 	void *filter_param;
 
-	printk(KERN_DEBUG "%s - dma_ch = %d\n", __func__, dma_ch);
 	dma_cap_zero(mask);
 	dma_cap_set(info->cap, mask);
 
@@ -35,11 +34,9 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 	 * specified, use that as the fliter parameter.
 	 */
 	 if(dma_ch == DMACH_DT_PROP){
-	 	printk(KERN_DEBUG "dmadev: using DMACH_DT_PROP");
 	 	filter_param = (void *)info->dt_dmach_prop;
 	 	chan = dma_request_channel(mask, pl330_filter, filter_param);
 	 } else {
-	 	printk(KERN_DEBUG "dmadev: using dma_ch");
 	 	chan = dma_request_channel(mask, pl330_filter, (void *)dma_ch);
 	 }
 
@@ -56,7 +53,6 @@ static unsigned samsung_dmadev_request(enum dma_ch dma_ch,
 		slave_config.dst_addr = info->fifo;
 		slave_config.dst_addr_width = info->width;
 		slave_config.dst_maxburst = 1;
-		printk(KERN_DEBUG "dmadev: dst_addr: %x\n", (unsigned int)slave_config.dst_addr);
 		dmaengine_slave_config(chan, &slave_config);
 	}
 
