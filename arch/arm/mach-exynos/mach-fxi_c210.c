@@ -26,6 +26,7 @@
 #include <linux/delay.h>
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
+#include <linux/pm_domain.h>
 
 #include <linux/dma-mapping.h>
 #include <linux/memblock.h>
@@ -866,6 +867,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s5p_device_fimc_md,
 	&s5p_device_fimd0,
 	&s5p_device_g2d,
+	&s5p_device_g3d,
 	&s5p_device_hdmi,
 	&s5p_device_i2c_hdmiphy,
 //	&s5p_device_jpeg,
@@ -944,6 +946,25 @@ static void __init fxi_c210_reserve(void)
     printk (KERN_ERR "Can't allocate FXI framebuffer memory\n");
   }
 }
+
+/**
+ * Make sure the Mali does not get powered down.
+ * TODO(havardk): Find out if there is a better way to do this.
+ */
+static __init int fxi_c210_pm_late_initcall(void)
+{
+	struct generic_pm_domain *p;
+
+	p = pd_to_genpd(s5p_device_g3d.dev.pm_domain);
+
+	/* This is flag not to call power_off callback */
+	/* pm_genpd_dev_always_on doesn't work with Mali */
+
+	p->status = GPD_STATE_WAIT_MASTER;
+
+	return 0;
+}
+subsys_initcall(fxi_c210_pm_late_initcall);
 
 static void __init fxi_c210_machine_init(void)
 {
