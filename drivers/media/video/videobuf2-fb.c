@@ -726,7 +726,7 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	info->fix.type	= FB_TYPE_PACKED_PIXELS;
 	info->fix.accel	= FB_ACCEL_NONE;
 	info->fix.visual = FB_VISUAL_TRUECOLOR;
-	info->fix.ypanstep = info->var.yres;
+	info->fix.ypanstep = 1;
 	info->var.activate = FB_ACTIVATE_NOW;
 	info->var.vmode	= FB_VMODE_NONINTERLACED;
 	info->fbops = &vb2_fb_ops;
@@ -754,6 +754,7 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 
 	printk(KERN_INFO "fb driver init: x: %d; y: %d; bpp: %d\n",
 	       info->var.xres, info->var.yres, info->var.bits_per_pixel);
+
 
 	return info;
 }
