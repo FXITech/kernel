@@ -755,7 +755,6 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	printk(KERN_INFO "fb driver init: x: %d; y: %d; bpp: %d\n",
 	       info->var.xres, info->var.yres, info->var.bits_per_pixel);
 
-
 	return info;
 }
 EXPORT_SYMBOL_GPL(vb2_fb_register);
