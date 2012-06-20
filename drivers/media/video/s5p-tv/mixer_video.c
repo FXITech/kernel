@@ -779,7 +779,8 @@ static int mxr_video_open(struct file *file)
 		goto fail_power;
 	}
 	/* set default format, first on the list */
-	layer->fmt = layer->fmt_array[0];
+	//TODO(havardk): Gross hack: default to argb8888.
+	layer->fmt = layer->fmt_array[3];
 	/* setup default geometry */
 	mxr_layer_default_geo(layer);
 
@@ -856,7 +857,9 @@ static int queue_setup(struct vb2_queue *vq, const struct v4l2_format *pfmt,
 	*nplanes = fmt->num_subframes;
 	for (i = 0; i < fmt->num_subframes; ++i) {
 		alloc_ctxs[i] = layer->mdev->alloc_ctx;
-		sizes[i] = PAGE_ALIGN(planes[i].sizeimage);
+		//TODO(havardk): Hack: return double size for double buffering
+		// framebuffer.
+		sizes[i] = PAGE_ALIGN(planes[i].sizeimage * 2);
 		mxr_dbg(mdev, "size[%d] = %08x\n", i, sizes[i]);
 	}
 

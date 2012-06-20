@@ -352,6 +352,7 @@ void mxr_reg_set_mbus_fmt(struct mxr_device *mdev,
 	struct v4l2_mbus_framefmt *fmt);
 void mxr_reg_graph_layer_stream(struct mxr_device *mdev, int idx, int en);
 void mxr_reg_graph_buffer(struct mxr_device *mdev, int idx, dma_addr_t addr);
+void mxr_reg_set_graph_base(struct mxr_device *mdev, int idx, dma_addr_t addr);
 void mxr_reg_graph_format(struct mxr_device *mdev, int idx,
 	const struct mxr_format *fmt, const struct mxr_geometry *geo);
 

@@ -235,6 +235,15 @@ void mxr_reg_graph_buffer(struct mxr_device *mdev, int idx, dma_addr_t addr)
 	spin_unlock_irqrestore(&mdev->reg_slock, flags);
 }
 
+void mxr_reg_set_graph_base(struct mxr_device *mdev, int idx, dma_addr_t addr)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&mdev->reg_slock, flags);
+	mxr_write(mdev, MXR_GRAPHIC_BASE(idx), addr);
+	spin_unlock_irqrestore(&mdev->reg_slock, flags);
+}
+
 void mxr_reg_vp_buffer(struct mxr_device *mdev,
 	dma_addr_t luma_addr[2], dma_addr_t chroma_addr[2])
 {
