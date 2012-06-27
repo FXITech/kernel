@@ -501,31 +501,6 @@ static struct s3c_sdhci_platdata fxi_c210_hsmmc2_pdata __initdata = {
  */
 static void (*wifi_status_cb)(struct platform_device *, int state);
 
-/*
- * WLAN: SDIO Host will call this func at booting time
- */
-static int fxi_c210_wifi_status_register(void (*notify_func)
-		(struct platform_device *, int state))
-{
-	if (!notify_func)
-		return -EAGAIN;
-	else
-		wifi_status_cb = notify_func;
-
-	return 0;
-}
-
-/* WLAN: MMC0-SDIO */
-static struct s3c_sdhci_platdata fxi_c210_hsmmc0_pdata __initdata = {
-	.max_width		= 4,
-	.host_caps		= MMC_CAP_4_BIT_DATA |
-			MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
-	.host_caps2		= MMC_CAP2_FCL_DELAY_INV,
-	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
-	.ext_cd_init		= fxi_c210_wifi_status_register,
-};
-
-
 #define GPIO_WLAN_SDIO_CLK	EXYNOS4_GPK0(0)
 #define GPIO_WLAN_SDIO_CMD	EXYNOS4_GPK0(1)
 #define GPIO_WLAN_SDIO_D0	EXYNOS4_GPK0(3)
@@ -584,6 +559,32 @@ static int fxi_c210_wifi_set_detect(bool val)
 
 	return 0;
 }
+
+/*
+ * WLAN: SDIO Host will call this func at booting time
+ */
+static int fxi_c210_wifi_status_register(void (*notify_func)
+		(struct platform_device *, int state))
+{
+	if (!notify_func)
+		return -EAGAIN;
+	else
+		wifi_status_cb = notify_func;
+
+	fxi_c210_wifi_set_detect(true);
+	return 0;
+}
+
+/* WLAN: MMC0-SDIO */
+static struct s3c_sdhci_platdata fxi_c210_hsmmc0_pdata __initdata = {
+	.max_width		= 4,
+	.host_caps		= MMC_CAP_4_BIT_DATA |
+			MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED,
+	.host_caps2		= MMC_CAP2_FCL_DELAY_INV,
+	.cd_type		= S3C_SDHCI_CD_EXTERNAL,
+	.ext_cd_init		= fxi_c210_wifi_status_register,
+};
+
 
 void bcm_wlan_power_on(int flag)
 {
