@@ -133,9 +133,9 @@ extern void dhd_wlfc_deinit(dhd_pub_t *dhd);
 #endif
 
 extern bool ap_fw_loaded;
-#ifdef CUSTOMER_HW2
+//#ifdef CUSTOMER_HW2
 extern char iface_name[IFNAMSIZ];
-#endif
+//#endif
 
 /**
  * Local (static) functions and variables
@@ -614,12 +614,12 @@ int wl_android_init(void)
 #ifdef ENABLE_INSMOD_NO_FW_LOAD
 	dhd_download_fw_on_driverload = FALSE;
 #endif /* ENABLE_INSMOD_NO_FW_LOAD */
-#ifdef CUSTOMER_HW2
+	//#ifdef CUSTOMER_HW2
 	if (!iface_name[0]) {
 		memset(iface_name, 0, IFNAMSIZ);
 		bcm_strncpy_s(iface_name, IFNAMSIZ, "wlan", IFNAMSIZ);
 	}
-#endif /* CUSTOMER_HW2 */
+	//#endif /* CUSTOMER_HW2 */
 	return ret;
 }
 
