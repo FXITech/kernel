@@ -770,7 +770,7 @@ static struct s3c_fb_platdata fxi_c210_lcd_pdata __initdata = {
 #endif
 /* Bluetooth rfkill gpio platform data */
 struct rfkill_gpio_platform_data fxi_c210_bt_pdata = {
-	.reset_gpio	= EXYNOS4_GPX2(2),
+	.reset_gpio	= EXYNOS4_GPK1(3),
 	.shutdown_gpio	= -1,
 	.type		= RFKILL_TYPE_BLUETOOTH,
 	.name		= "fxi_c210-bt",
