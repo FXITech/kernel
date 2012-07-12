@@ -59,15 +59,12 @@
 
 #include "common.h"
 
-#define MFC_RBASE 0x44000000
-#define MFC_RSIZE (16 << 20)
+#define MFC_RBASE 0x43000000
+#define MFC_RSIZE (32 << 20)
 
-#define MFC_LBASE 0x4b000000
-#define MFC_LSIZE (16 << 20)
+#define MFC_LBASE 0x51000000
+#define MFC_LSIZE (32 << 20)
 
-#define FXIFB_BASE 0x48000000
-#define FXIFB_SIZE (16 << 20)
-#define FXIFB_BUFS 2
 
 /* Following are default values for UCON, ULCON and UFCON UART registers */
 #define FXI_C210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
@@ -810,28 +807,6 @@ static struct platform_device btbutton_device_gpiokeys = {
   },
 };
 
-/* FXI FB */
-static struct resource fxifb_resource[] = {
-  [0] = {
-    .start = FXIFB_BASE,
-    .end   = FXIFB_BASE + (FXIFB_SIZE*FXIFB_BUFS) - 1,
-    .flags = IORESOURCE_MEM,
-  },
-};
-
-static u64 fxifb_dma_mask = DMA_BIT_MASK(32);
-
-struct platform_device fxifb_device = {
-  .name   = "fxifb",
-  .id   = -1,
-  .num_resources  = ARRAY_SIZE(fxifb_resource),
-  .resource = fxifb_resource,
-  .dev    = {
-    .dma_mask   = &fxifb_dma_mask,
-    .coherent_dma_mask  = DMA_BIT_MASK(32),
-  },
-};
-
 /* FXI Sysfs */
 
 static struct platform_device fxi_sysfs = {
@@ -856,7 +831,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_hsmmc3,
 	&s3c_device_i2c0,
 	&s3c_device_i2c1,
-	&fxifb_device,
 	&s3c_device_rtc,
 	&s3c_device_wdt,
 	&s3c_device_usb_hsotg,
@@ -942,10 +916,6 @@ static void __init fxi_c210_power_init(void)
 static void __init fxi_c210_reserve(void)
 {
   s5p_mfc_reserve_mem(MFC_RBASE, MFC_RSIZE, MFC_LBASE, MFC_LSIZE);
-
-  if (memblock_remove(FXIFB_BASE, (FXIFB_SIZE*FXIFB_BUFS))) {
-    printk (KERN_ERR "Can't allocate FXI framebuffer memory\n");
-  }
 }
 
 /**
