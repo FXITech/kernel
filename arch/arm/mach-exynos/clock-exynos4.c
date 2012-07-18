@@ -1958,6 +1958,13 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 	clk_set_parent(&clk_sclk_audss.clk, &exynos4_clk_mout_audss.clk);
 	clk_set_parent(&exynos4_clk_mout_audss.clk, &clk_fout_epll);
 	clk_set_parent(&exynos4_clk_sclk_audio0.clk, &exynos4_clk_mout_epll.clk);
+
+	/* Temp. hack to enable video on the Cotton Candy */
+	for (ptr = 0; ptr < 4; ptr++) {
+		clk_set_parent(&exynos4_clksrcs[5+ptr].clk, &exynos4_clk_mout_mpll.clk);
+		clk_set_rate(&exynos4_clksrcs[5+ptr].clk, 166000000UL);
+	}
+	
 	for (ptr = 0; ptr < ARRAY_SIZE(exynos4_clksrcs); ptr++)
 		s3c_set_clksrc(&exynos4_clksrcs[ptr], true);
 }
