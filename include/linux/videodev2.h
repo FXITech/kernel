@@ -604,6 +604,7 @@ struct v4l2_plane {
 		unsigned long	userptr;
 	} m;
 	__u32			data_offset;
+	void			*cookie;
 	__u32			reserved[11];
 };
 
