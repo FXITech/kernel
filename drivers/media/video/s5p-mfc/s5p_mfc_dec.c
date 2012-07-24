@@ -634,7 +634,7 @@ static int vidioc_streamoff(struct file *file, void *priv,
 static int s5p_mfc_dec_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct s5p_mfc_ctx *ctx = ctrl_to_ctx(ctrl);
-
+	printk(KERN_DEBUG "entered s5p_mfc_dec_s_ctrl. Ctrl ID: %d", ctrl->id);
 	switch (ctrl->id) {
 	case V4L2_CID_MPEG_MFC51_VIDEO_DECODER_H264_DISPLAY_DELAY:
 		ctx->display_delay = ctrl->val;
@@ -1012,6 +1012,7 @@ int s5p_mfc_dec_ctrls_setup(struct s5p_mfc_ctx *ctx)
 
 	for (i = 0; i < NUM_CTRLS; i++) {
 		if (IS_MFC51_PRIV(controls[i].id)) {
+			memset(&cfg, 0, sizeof(struct v4l2_ctrl_config));
 			cfg.ops = &s5p_mfc_dec_ctrl_ops;
 			cfg.id = controls[i].id;
 			cfg.min = controls[i].minimum;
