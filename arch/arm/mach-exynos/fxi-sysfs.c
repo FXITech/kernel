@@ -42,10 +42,6 @@ enum	{
 	WIFI_WAKEUP_HOST,
 	
 	// Bluetooth Control Port
-	BLUETOOTH_RESET,
-	BLUETOOTH_REG,
-	BLUETOOTH_WAKEUP,
-	BLUETOOTH_WAKEUP_HOST,
 	BLUETOOTH_BUTTON,
 	
 	// 3G Modem Control Port
@@ -85,15 +81,6 @@ static struct {
 	{	WIFI_WAKEUP,			EXYNOS4_GPK1(4), "wifi_wakeup", 		1, 1, S3C_GPIO_PULL_UP	},
 	// Low -> High : Wifi wake up request to host
 	{	WIFI_WAKEUP_HOST,		EXYNOS4_GPX0(7), "wifi_wakeup_host", 	0, 0, S3C_GPIO_PULL_UP	},
-
-	// High -> Reset Active
-	{	BLUETOOTH_RESET,		EXYNOS4_GPK1(2), "bt_reset", 			1, 1, S3C_GPIO_PULL_UP	},
-	// High -> REG Active
-	{	BLUETOOTH_REG,			EXYNOS4_GPK1(3), "bt_reg", 				1, 1, S3C_GPIO_PULL_UP	},
-	// High -> Wakeup Active
-	{	BLUETOOTH_WAKEUP,		EXYNOS4_GPK1(5), "bt_wakeup", 			1, 1, S3C_GPIO_PULL_UP	},
-	// Low -> High : BT wake up request to host
-	{	BLUETOOTH_WAKEUP_HOST,	EXYNOS4_GPX0(6), "bt_wakeup_host",		0, 0, S3C_GPIO_PULL_UP	},
 
 	{	BLUETOOTH_BUTTON,			EXYNOS4_GPX3(5), "bt_button",		0, 0, S3C_GPIO_PULL_UP	},
 
@@ -163,10 +150,6 @@ static	DEVICE_ATTR(wifi_reg, 			S_IRWXUGO, show_gpio, set_gpio);
 static	DEVICE_ATTR(wifi_wakeup, 		S_IRWXUGO, show_gpio, set_gpio);
 static	DEVICE_ATTR(wifi_wakeup_host, 	S_IRWXUGO, show_gpio, set_gpio);
 
-static	DEVICE_ATTR(bt_reset, 			S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(bt_reg, 			S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(bt_wakeup, 			S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(bt_wakeup_host,		S_IRWXUGO, show_gpio, set_gpio);
 static	DEVICE_ATTR(bt_button,		S_IRWXUGO, show_gpio, set_gpio);
 
 static	DEVICE_ATTR(modem_power, 		S_IRWXUGO, show_gpio, set_gpio);
@@ -191,10 +174,6 @@ static struct attribute *fxi_sysfs_entries[] = {
 	&dev_attr_wifi_wakeup.attr,
 	&dev_attr_wifi_wakeup_host.attr,
 
-	&dev_attr_bt_reset.attr,
-	&dev_attr_bt_reg.attr,
-	&dev_attr_bt_wakeup.attr,
-	&dev_attr_bt_wakeup_host.attr,
 	&dev_attr_bt_button,
 
 	&dev_attr_modem_power.attr,
