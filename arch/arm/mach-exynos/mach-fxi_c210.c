@@ -498,56 +498,13 @@ static struct s3c_sdhci_platdata fxi_c210_hsmmc2_pdata __initdata = {
  */
 static void (*wifi_status_cb)(struct platform_device *, int state);
 
-#define GPIO_WLAN_SDIO_CLK	EXYNOS4_GPK0(0)
-#define GPIO_WLAN_SDIO_CMD	EXYNOS4_GPK0(1)
-#define GPIO_WLAN_SDIO_D0	EXYNOS4_GPK0(3)
-#define GPIO_WLAN_SDIO_D1	EXYNOS4_GPK0(4)
-#define GPIO_WLAN_SDIO_D2	EXYNOS4_GPK0(5)
-#define GPIO_WLAN_SDIO_D3	EXYNOS4_GPK0(6)
-
-static void fxi_c210_wlan_enable(void)
-{
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CLK, S3C_GPIO_SFN(2));
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CMD, S3C_GPIO_SFN(2));
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D0, S3C_GPIO_SFN(2));
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D1, S3C_GPIO_SFN(2));
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D2, S3C_GPIO_SFN(2));
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D3, S3C_GPIO_SFN(2));
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_CLK, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_CMD, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D0, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D1, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D2, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D3, S3C_GPIO_PULL_NONE);
-
-	msleep(100);
-}
-
-static void fxi_c210_wlan_disable(void) {
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CLK, S3C_GPIO_INPUT);
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_CMD, S3C_GPIO_INPUT);
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D0, S3C_GPIO_INPUT);
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D1, S3C_GPIO_INPUT);
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D2, S3C_GPIO_INPUT);
-	s3c_gpio_cfgpin(GPIO_WLAN_SDIO_D3, S3C_GPIO_INPUT);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_CLK, S3C_GPIO_PULL_DOWN);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_CMD, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D0, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D1, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D2, S3C_GPIO_PULL_NONE);
-	s3c_gpio_setpull(GPIO_WLAN_SDIO_D3, S3C_GPIO_PULL_NONE);
-}
+#define GPIO_WLAN_RESET		EXYNOS4_GPK1(1)
 
 /*
  * This will be called at init time of WLAN driver
  */
 static int fxi_c210_wifi_set_detect(bool val)
 {
-	if (val)
-		fxi_c210_wlan_enable();
-	else
-		fxi_c210_wlan_disable();
-
 	if (!wifi_status_cb) {
 		printk(KERN_WARNING "WLAN: Nobody to notify\n");
 		return -EAGAIN;
@@ -569,6 +526,12 @@ static int fxi_c210_wifi_status_register(void (*notify_func)
 		wifi_status_cb = notify_func;
 
 	fxi_c210_wifi_set_detect(true);
+
+	if (gpio_request(GPIO_WLAN_RESET, "wlan-reset"))
+		printk(KERN_WARNING "FXI C210: Unable to request gpio pin for wlan reset\n");
+	else
+		gpio_direction_output(EXYNOS4_GPK1(1), 1);
+
 	return 0;
 }
 
@@ -587,6 +550,7 @@ void bcm_wlan_power_on(int flag)
 {
 	if (flag == 1) {
 		printk(KERN_DEBUG "[WIFI] Enabling device\n");
+		gpio_direction_output(EXYNOS4_GPK1(1), 1);
 		fxi_c210_wifi_set_detect(true);
 	} else {
 		printk(KERN_DEBUG "%s: flag=%d - skip\n", __FUNCTION__, flag);
@@ -599,6 +563,7 @@ void bcm_wlan_power_off(int flag)
 	if (flag == 1) {
 		printk(KERN_DEBUG "[WIFI] Disabling device\n");
 		fxi_c210_wifi_set_detect(false);
+		gpio_direction_output(EXYNOS4_GPK1(1), 0);
 	} else {
 		printk(KERN_DEBUG "%s: flag=%d - skip\n", __FUNCTION__, flag);
 	}

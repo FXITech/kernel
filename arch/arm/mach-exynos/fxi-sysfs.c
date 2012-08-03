@@ -35,13 +35,7 @@
 
 // GPIO Index Define
 enum	{
-	// WIFI Control Port
-	WIFI_RESET,
-	WIFI_REG,
-	WIFI_WAKEUP,
-	WIFI_WAKEUP_HOST,
-	
-	// Bluetooth Control Port
+	// Bluetooth
 	BLUETOOTH_BUTTON,
 	
 	// 3G Modem Control Port
@@ -73,15 +67,6 @@ static struct {
 	int 	value;			// Default Value(only for output)
 	int		pud;				// Pull up/down register setting : S3C_GPIO_PULL_DOWN, UP, NONE
 } sControlGpios[] = {
-	// High -> Reset Active
-	{	WIFI_RESET,				EXYNOS4_GPK1(0), "wifi_reset",			1, 1, S3C_GPIO_PULL_UP	},
-	// High -> REG Active
-	{	WIFI_REG,				EXYNOS4_GPK1(1), "wifi_reg", 			1, 1, S3C_GPIO_PULL_UP	},
-	// High -> Wakeup Active
-	{	WIFI_WAKEUP,			EXYNOS4_GPK1(4), "wifi_wakeup", 		1, 1, S3C_GPIO_PULL_UP	},
-	// Low -> High : Wifi wake up request to host
-	{	WIFI_WAKEUP_HOST,		EXYNOS4_GPX0(7), "wifi_wakeup_host", 	0, 0, S3C_GPIO_PULL_UP	},
-
 	{	BLUETOOTH_BUTTON,			EXYNOS4_GPX3(5), "bt_button",		0, 0, S3C_GPIO_PULL_UP	},
 
 	// High -> Power Enable
@@ -145,11 +130,6 @@ static	ssize_t show_gpio	(struct device *dev, struct device_attribute *attr, cha
 static 	ssize_t set_gpio	(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static	ssize_t show_hdmi	(struct device *dev, struct device_attribute *attr, char *buf);
 
-static	DEVICE_ATTR(wifi_reset, 		S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(wifi_reg, 			S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(wifi_wakeup, 		S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(wifi_wakeup_host, 	S_IRWXUGO, show_gpio, set_gpio);
-
 static	DEVICE_ATTR(bt_button,		S_IRWXUGO, show_gpio, set_gpio);
 
 static	DEVICE_ATTR(modem_power, 		S_IRWXUGO, show_gpio, set_gpio);
@@ -169,11 +149,6 @@ static	DEVICE_ATTR(power_12v0,			S_IRWXUGO, show_gpio, set_gpio);
 static	DEVICE_ATTR(hdmi_state,			S_IRWXUGO, show_hdmi, NULL);
 
 static struct attribute *fxi_sysfs_entries[] = {
-	&dev_attr_wifi_reset.attr,
-	&dev_attr_wifi_reg.attr,
-	&dev_attr_wifi_wakeup.attr,
-	&dev_attr_wifi_wakeup_host.attr,
-
 	&dev_attr_bt_button,
 
 	&dev_attr_modem_power.attr,
