@@ -19,7 +19,7 @@ UDD_FILE_PREFIX := drivers/gpu/arm/ump/
 
 ## @note Should allow overriding of building UMP for non-debug:
 
-ifeq (($CONFIG_UMP_DEBUG),y)
+ifeq ($(CONFIG_UMP_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG
 endif
 EXTRA_CFLAGS += -DMALI_STATE_TRACKING=0
@@ -61,7 +61,7 @@ ump-y:=	$(UMP_FILE_PREFIX)common/ump_kernel_common.o \
 
 # Get subversion revision number, fall back to 0000 if no svn info is available
 SVN_REV:=$(shell ((svnversion | grep -qvE '(exported|Unversioned)' && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
-	
+
 EXTRA_CFLAGS += -DSVN_REV=$(SVN_REV)
 EXTRA_CFLAGS += -DSVN_REV_STRING=\"$(SVN_REV)\"
 
