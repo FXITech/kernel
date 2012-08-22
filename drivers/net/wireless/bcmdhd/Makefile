@@ -13,8 +13,7 @@ DHDCFLAGS = -Wall -Wstrict-prototypes -Dlinux -DBCMDRIVER                     \
 	-DCUSTOMER_HW -DMMC_SDIO_ABORT -DBCMLXSDMMC -DBCMPLATFORM_BUS         \
 	-DWIFI_ACT_FRAME -DARP_OFFLOAD_SUPPORT                                \
 	-DKEEP_ALIVE -DGET_CUSTOM_MAC_ENABLE -DPKT_FILTER_SUPPORT             \
-	-DPNO_SUPPORT                                                         \
-	-Idrivers/net/wireless/bcmdhd -Idrivers/net/wireless/bcmdhd/include
+	-DPNO_SUPPORT -I$(src)/include
 
 DHDOFILES = aiutils.o bcmsdh_sdmmc_linux.o dhd_linux.o siutils.o bcmutils.o   \
 	dhd_linux_sched.o dhd_sdio.o bcmwifi_channels.o bcmevent.o hndpmu.o   \
@@ -31,7 +30,7 @@ ifneq ($(CONFIG_CFG80211),)
 bcmdhd-objs += wl_cfg80211.o wl_cfgp2p.o wl_linux_mon.o dhd_cfg80211.o
 DHDCFLAGS += -DWL_CFG80211 -DWL_CFG80211_STA_EVENT -DWL_ENABLE_P2P_IF
 endif
-EXTRA_CFLAGS = $(DHDCFLAGS)
+ccflags-y = $(DHDCFLAGS)
 ifeq ($(CONFIG_BCMDHD),m)
-EXTRA_LDFLAGS += --strip-debug
+ldflags-y += --strip-debug
 endif
