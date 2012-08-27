@@ -934,6 +934,7 @@ static long __video_do_ioctl(struct file *file,
 			break;
 
 		ret = ops->vidioc_qbuf(file, fh, p);
+
 		if (!ret)
 			dbgbuf(cmd, vfd, p);
 		break;
