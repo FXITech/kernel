@@ -790,6 +790,24 @@ static struct platform_device fxi_mali = {
   .id = -1,
 };
 
+
+static struct resource fxichardev_resource[] = {
+};
+
+static u64 fxichardev_dma_mask = DMA_BIT_MASK(32);
+
+struct platform_device fxi_c210_device_chardev = {
+  .name   = "fxichardev",
+  .id   = -1,
+  .num_resources  = ARRAY_SIZE(fxichardev_resource),
+  .resource = fxichardev_resource,
+  .dev    = {
+    .dma_mask   = &fxichardev_dma_mask,
+    .coherent_dma_mask  = DMA_BIT_MASK(32),
+  },
+};
+
+
 static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_hsmmc2,
 	&s3c_device_hsmmc0,
@@ -798,6 +816,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_i2c1,
 	&s3c_device_rtc,
 	&s3c_device_wdt,
+	&fxi_c210_device_chardev,
 	&s3c_device_usb_hsotg,
 	&s5p_device_ehci,
 	&s5p_device_fimc0,
@@ -920,10 +939,10 @@ static void __init fxi_c210_machine_init(void)
 	s3c_sdhci0_set_platdata(&fxi_c210_hsmmc0_pdata);
 	s3c_sdhci3_set_platdata(&fxi_c210_hsmmc3_pdata);
 
+	clk_xusbxti.rate = 24000000;
 	fxi_c210_ehci_init();
 	fxi_c210_ohci_init();
 	s3c_hsotg_set_platdata(&fxi_c210_hsotg_pdata);
-	clk_xusbxti.rate = 24000000;
 
 	s5p_tv_setup();
 	s5p_i2c_hdmiphy_set_platdata(NULL);

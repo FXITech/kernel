@@ -28,6 +28,8 @@ typedef struct ump_dd_mem
 	void * ctx;
 	void * backend_info;
 	int is_cached;
+	int is_contiguous;
+	void *contiguous_cpu_addr;
 } ump_dd_mem;
 
 

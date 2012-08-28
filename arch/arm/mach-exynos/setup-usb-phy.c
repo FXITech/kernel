@@ -56,11 +56,10 @@ static void exynos4_usb_phy_clkset(struct platform_device *pdev)
 
 static int exynos4_usb_phy0_init(struct platform_device *pdev)
 {
+#if 0
 	u32 rstcon;
-
 	writel(readl(S5P_USBDEVICE_PHY_CONTROL) | S5P_USBDEVICE_PHY_ENABLE,
-			S5P_USBDEVICE_PHY_CONTROL);
-
+		S5P_USBDEVICE_PHY_CONTROL);
 	exynos4_usb_phy_clkset(pdev);
 
 	/* set to normal PHY0 */
@@ -69,12 +68,26 @@ static int exynos4_usb_phy0_init(struct platform_device *pdev)
 	/* reset PHY0 and Link */
 	rstcon = readl(EXYNOS4_RSTCON) | PHY0_SWRST_MASK;
 	writel(rstcon, EXYNOS4_RSTCON);
-	udelay(10);
 
+	/* manual says "at least 10us", so 20 ought to be fine */
+	udelay(20);
 	rstcon &= ~PHY0_SWRST_MASK;
 	writel(rstcon, EXYNOS4_RSTCON);
 	udelay(80);
-
+#else
+	writel(readl(S5P_USBDEVICE_PHY_CONTROL) | (0x1<<0),
+		S5P_USBDEVICE_PHY_CONTROL);
+	writel((readl(EXYNOS4_PHYPWR) & ~(0x7<<3)&~(0x1<<0)),
+		EXYNOS4_PHYPWR);
+	writel((readl(EXYNOS4_PHYCLK) & ~(0x5<<2))|(0x3<<0),
+		EXYNOS4_PHYCLK);
+	writel((readl(EXYNOS4_RSTCON) & ~(0x3<<1))|(0x1<<0),
+		EXYNOS4_RSTCON);
+	udelay(10);
+	writel(readl(EXYNOS4_RSTCON) & ~(0x7<<0),
+		EXYNOS4_RSTCON);
+	udelay(80);
+#endif
 	return 0;
 }
 
