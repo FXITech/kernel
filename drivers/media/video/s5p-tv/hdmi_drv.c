@@ -591,6 +591,39 @@ static const struct hdmi_preset_conf hdmi_conf_480p = {
 	},
 };
 
+static const struct hdmi_preset_conf hdmi_conf_720p50 = {
+	.core = {
+		.h_blank = {0xbc, 0x02},
+		.v_blank = {0xee, 0xf2, 0x00},
+		.h_v_line = {0xee, 0xc2, 0x7b},
+		.vsync_pol = {0x00},
+		.int_pro_mode = {0x00},
+		.v_blank_f = {0x00, 0x00, 0x00}, /* don't care */
+		.h_sync_gen = {0xb6, 0x79, 0x07},
+		.v_sync_gen1 = {0x0a, 0x50, 0x00},
+		/* other don't care */
+	},
+	.tg = {
+		0x00, /* cmd */
+		0x72, 0x06, /* h_fsz */
+		0x72, 0x01, 0x00, 0x05, /* hact */
+		0xee, 0x02, /* v_fsz */
+		0x01, 0x00, 0x33, 0x02, /* vsync */
+		0x1e, 0x00, 0xd0, 0x02, /* vact */
+		0x33, 0x02, /* field_chg */
+		0x49, 0x02, /* vact_st2 */
+		0x01, 0x00, 0x33, 0x02, /* vsync top/bot */
+		0x01, 0x00, 0x33, 0x02, /* field top/bot */
+	},
+	.mbus_fmt = {
+		.width = 1280,
+		.height = 720,
+		.code = V4L2_MBUS_FMT_FIXED, /* means RGB888 */
+		.field = V4L2_FIELD_NONE,
+		.colorspace = V4L2_COLORSPACE_SRGB,
+	},
+};
+
 static const struct hdmi_preset_conf hdmi_conf_720p60 = {
 	.core = {
 		.h_blank = {0x72, 0x01},
