@@ -58,14 +58,19 @@ struct vb2_fb_data {
 	void *vaddr;
 	unsigned int size;
 	int refcount;
+	int mmapped;
 	int blank;
 	int streaming;
+	int dv_preset;
 
 	struct file fake_file;
 	struct dentry fake_dentry;
 	struct inode fake_inode;
 };
 
+static int vb2_fb_activate(struct fb_info *info);
+static int vb2_fb_deactivate(struct fb_info *info);
+static int vb2_fb_start(struct fb_info *info);
 static int vb2_fb_stop(struct fb_info *info);
 
 struct fmt_desc {
@@ -302,6 +307,78 @@ static inline void vb2_drv_unlock(struct vb2_queue *q)
 	q->ops->wait_prepare(q);
 }
 
+static int find_dv_preset(struct fb_info *info, int xres, int yres) {
+	struct vb2_fb_data *data = info->par;
+	int dv_preset = 0;
+	int i;
+
+	if (!data->vfd->ioctl_ops->vidioc_enum_dv_presets) {
+		return 0;
+	}
+
+	for (i = 0; ; i++) {
+		int enum_status;
+		struct v4l2_dv_enum_preset preset = {0};
+		preset.index = i;
+		enum_status = data->vfd->ioctl_ops->vidioc_enum_dv_presets(
+			&data->fake_file, data->fake_file.private_data, &preset);
+		if (enum_status)
+			break;
+		dprintk(2, "DV preset: %d: %s (%dx%d)\n",
+			preset.preset, preset.name, preset.width, preset.height);
+		/*
+		 * Note that only exact matches are handled at the moment.
+		 * Should be fixed?
+		 */
+		if (preset.width == xres && preset.height == yres) {
+			dv_preset = preset.preset;
+		}
+	}
+
+	return dv_preset;
+}
+
+static int fxifb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+{
+	struct vb2_fb_data *data = info->par;
+
+	if ((var->xres != 0 && var->xres != info->var.xres) ||
+	    (var->yres != 0 && var->yres != info->var.yres)) {
+		int preset;
+		preset = find_dv_preset(info, var->xres, var->yres);
+		if (!preset) {
+			printk(KERN_ERR "Did not find preset for resolution (%dx%d)\n",
+			       var->xres, var->yres);
+			return -EINVAL;
+		}
+		data->dv_preset = preset;
+		info->var.xres = var->xres;
+		info->var.yres = var->yres;
+	}
+
+	return 0;
+}
+
+static int fxifb_set_par(struct fb_info *info)
+{
+	struct vb2_fb_data *data = info->par;
+
+	if (data->dv_preset != 0) {
+		if (data->mmapped) {
+			printk(KERN_ERR "Refusing to change resolution because "
+			       "framebuffer is mmaped by user\n");
+			return -EBUSY;
+		}
+		/* Restart underlying video device */
+		vb2_drv_lock(data->q);
+		vb2_fb_deactivate(info);
+		vb2_fb_activate(info);
+		vb2_drv_unlock(data->q);
+		vb2_fb_start(info);
+	}
+	return 0;
+}
+
 /**
  * vb2_fb_activate() - activate framebuffer emulator
  * @info:	framebuffer vb2 emulator data
@@ -334,6 +411,24 @@ static int vb2_fb_activate(struct fb_info *info)
 	ret = data->vfd->fops->open(&data->fake_file);
 	if (ret)
 		return ret;
+
+	if (data->dv_preset && data->vfd->ioctl_ops->vidioc_s_dv_preset) {
+		struct v4l2_dv_preset preset = {0};
+		struct v4l2_format fmt = {0};
+		printk("Setting video node to preset: %d\n", data->dv_preset);
+		preset.preset = data->dv_preset;
+		ret = data->vfd->ioctl_ops->vidioc_s_dv_preset(
+			&data->fake_file, data->fake_file.private_data, &preset);
+		if (ret)
+			printk(KERN_ERR "fb emu: Setting dv preset failed: %d\n", ret);
+		/* Make sure the buffer size is changed to the new resolution */
+		data->vfd->ioctl_ops->vidioc_g_fmt_vid_out_mplane(
+			&data->fake_file, data->fake_file.private_data, &fmt);
+		fmt.fmt.pix.width = info->var.xres;
+		fmt.fmt.pix.height = info->var.yres;
+		data->vfd->ioctl_ops->vidioc_s_fmt_vid_out_mplane(
+			&data->fake_file, data->fake_file.private_data, &fmt);
+	}
 
 	/*
 	 * Get format from the video node.
@@ -413,6 +508,7 @@ static int vb2_fb_activate(struct fb_info *info)
 		goto err;
 	}
 	data->size = size = vb2_plane_size(q->bufs[0], 0);
+	data->mmapped = 0;
 
 	/*
 	 * Clear the buffer
@@ -625,6 +721,8 @@ static int vb2_fb_mmap(struct fb_info *info, struct vm_area_struct *vma)
 
 	vb2_drv_lock(data->q);
 	ret = vb2_mmap(data->q, vma);
+	if (!ret)
+		data->mmapped = 1;
 	vb2_drv_unlock(data->q);
 
 	return ret;
@@ -692,6 +790,8 @@ static struct fb_ops vb2_fb_ops = {
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
 	.fb_ioctl 	= fxifb_ioctl,
+	.fb_check_var   = fxifb_check_var,
+	.fb_set_par     = fxifb_set_par,
 };
 
 /**
@@ -751,6 +851,7 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	data->fake_file.f_path.dentry = &data->fake_dentry;
 	data->fake_dentry.d_inode = &data->fake_inode;
 	data->fake_inode.i_rdev = vfd->cdev->dev;
+	data->dv_preset = 0;
 
 	printk(KERN_INFO "fb driver init: x: %d; y: %d; bpp: %d\n",
 	       info->var.xres, info->var.yres, info->var.bits_per_pixel);
