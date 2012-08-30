@@ -60,9 +60,10 @@ static const u8 hdmiphy_conf148_5[32] = {
 
 static const struct hdmiphy_conf hdmiphy_conf[] = {
 	{ V4L2_DV_480P59_94, hdmiphy_conf27 },
-	{ V4L2_DV_1080P30, hdmiphy_conf74_175 },
+	{ V4L2_DV_720P50, hdmiphy_conf74_25 },
 	{ V4L2_DV_720P59_94, hdmiphy_conf74_175 },
 	{ V4L2_DV_720P60, hdmiphy_conf74_25 },
+	{ V4L2_DV_1080P30, hdmiphy_conf74_175 },
 	{ V4L2_DV_1080P50, hdmiphy_conf148_5 },
 	{ V4L2_DV_1080P60, hdmiphy_conf148_5 },
 };
