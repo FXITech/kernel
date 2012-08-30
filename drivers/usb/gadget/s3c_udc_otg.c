@@ -41,12 +41,12 @@
 #error " Unknown S3C OTG operation mode, Select a correct operation mode"
 #endif
 
-#define DEBUG_S3C_UDC_SETUP
-#define DEBUG_S3C_UDC_EP0
-#define DEBUG_S3C_UDC_ISR
-#define DEBUG_S3C_UDC_OUT_EP
-#define DEBUG_S3C_UDC_IN_EP
-#define DEBUG_S3C_UDC
+#undef DEBUG_S3C_UDC_SETUP
+#undef DEBUG_S3C_UDC_EP0
+#undef DEBUG_S3C_UDC_ISR
+#undef DEBUG_S3C_UDC_OUT_EP
+#undef DEBUG_S3C_UDC_IN_EP
+#undef DEBUG_S3C_UDC
 
 #define EP0_CON		0
 #define EP1_OUT		1
@@ -298,8 +298,8 @@ int s3c_udc_start(struct usb_gadget_driver *driver,
 	DEBUG_SETUP("%s: %s\n", __func__, driver->driver.name);
 
 	if (!driver
-		|| (driver->speed != USB_SPEED_FULL
-				&& driver->speed != USB_SPEED_HIGH)
+		|| (driver->max_speed != USB_SPEED_FULL
+				&& driver->max_speed != USB_SPEED_HIGH)
 		|| !bind || !driver->disconnect || !driver->setup)
 		return -EINVAL;
 	if (!dev)
@@ -330,7 +330,7 @@ int s3c_udc_start(struct usb_gadget_driver *driver,
 		return retval;
 	}
 
-	enable_irq(IRQ_USB_HSOTG);
+	enable_irq(EXYNOS4_IRQ_USB_HSOTG);
 
 	retval = usb_gadget_vbus_connect(&dev->gadget);
 	if (retval < 0)
@@ -364,7 +364,7 @@ int s3c_udc_stop(struct usb_gadget_driver *driver)
 	driver->unbind(&dev->gadget);
 	device_del(&dev->gadget.dev);
 
-	disable_irq(IRQ_USB_HSOTG);
+	disable_irq(EXYNOS4_IRQ_USB_HSOTG);
 
 	pr_debug("Unregistered gadget driver '%s'\n",
 			driver->driver.name);
@@ -377,7 +377,7 @@ int s3c_udc_stop(struct usb_gadget_driver *driver)
 static int s3c_udc_power(struct s3c_udc *dev, char en)
 {
 	pr_debug("%s : %s\n", __func__, en ? "ON" : "OFF");
-
+#if !defined(CONFIG_MACH_FXI_C210)
 	if (en) {
 		regulator_enable(dev->udc_vcc_d);
 		regulator_enable(dev->udc_vcc_a);
@@ -385,7 +385,7 @@ static int s3c_udc_power(struct s3c_udc *dev, char en)
 		regulator_disable(dev->udc_vcc_d);
 		regulator_disable(dev->udc_vcc_a);
 	}
-
+#endif
 	return 0;
 }
 
@@ -483,7 +483,7 @@ static void stop_activity(struct s3c_udc *dev,
 	/* don't disconnect drivers more than once */
 	if (dev->gadget.speed == USB_SPEED_UNKNOWN)
 		driver = 0;
-	dev->gadget.speed = USB_SPEED_UNKNOWN;
+	dev->gadget.max_speed = USB_SPEED_UNKNOWN;
 
 	/* prevent new request submissions, kill any outstanding requests */
 	for (i = 0; i < S3C_MAX_ENDPOINTS; i++) {
@@ -666,6 +666,7 @@ static int s3c_ep_enable(struct usb_ep *_ep,
 	}
 
 	dev = ep->dev;
+
 	if (!dev->driver || dev->gadget.speed == USB_SPEED_UNKNOWN) {
 
 		DEBUG("%s: bogus device state\n", __func__);
@@ -869,6 +870,7 @@ void s3c_udc_soft_disconnect(void)
 	uTemp |= SOFT_DISCONNECT;
 	writel(uTemp, S3C_UDC_OTG_DCTL);
 
+
 	spin_lock_irqsave(&dev->lock, flags);
 	stop_activity(dev, dev->driver);
 	spin_unlock_irqrestore(&dev->lock, flags);
@@ -894,7 +896,9 @@ static const struct usb_gadget_ops s3c_udc_ops = {
 
 static void nop_release(struct device *dev)
 {
+#if 0 /* bus_id is not here in newer kernels */
 	DEBUG("%s %s\n", __func__, dev->bus_id);
+#endif
 }
 
 static struct s3c_udc memory = {
@@ -1159,20 +1163,22 @@ static int s3c_udc_probe(struct platform_device *pdev)
 	dev->gadget.dev.parent = &pdev->dev;
 	dev_set_name(&dev->gadget.dev, "%s", "gadget");
 
-	dev->gadget.is_dualspeed = 1;	/* Hack only*/
 	dev->gadget.is_otg = 0;
 	dev->gadget.is_a_peripheral = 0;
 	dev->gadget.b_hnp_enable = 0;
 	dev->gadget.a_hnp_support = 0;
 	dev->gadget.a_alt_hnp_support = 0;
+	dev->gadget.max_speed = USB_SPEED_HIGH;
 
+#if !defined(CONFIG_MACH_FXI_C210)
 	dev->udc_vcc_d = regulator_get(&pdev->dev, "pd_io");
 	dev->udc_vcc_a = regulator_get(&pdev->dev, "pd_core");
 	if (IS_ERR(dev->udc_vcc_d) || IS_ERR(dev->udc_vcc_a)) {
 		pr_err("failed to find udc vcc source\n");
 		return -ENOENT;
 	}
-
+#endif
+	
 	the_controller = dev;
 	platform_set_drvdata(pdev, dev);
 
@@ -1184,14 +1190,14 @@ static int s3c_udc_probe(struct platform_device *pdev)
 	udc_reinit(dev);
 
 	/* irq setup after old hardware state is cleaned up */
-	retval = request_irq(IRQ_USB_HSOTG, s3c_udc_irq, 0, driver_name, dev);
+	retval = request_irq(EXYNOS4_IRQ_USB_HSOTG, s3c_udc_irq, 0, driver_name, dev);
 
 	if (retval != 0) {
-		pr_err("can't get irq %i, err %d\n", IRQ_USB_HSOTG, retval);
+		pr_err("can't get irq %i, err %d\n", EXYNOS4_IRQ_USB_HSOTG, retval);
 		goto err_req_irq;
 	}
 
-	disable_irq(IRQ_USB_HSOTG);
+	disable_irq(EXYNOS4_IRQ_USB_HSOTG);
 	retval = usb_add_gadget_udc(&pdev->dev, &dev->gadget);
 	if (retval)
 		goto err_add_udc;
@@ -1201,6 +1207,7 @@ static int s3c_udc_probe(struct platform_device *pdev)
 	return retval;
 
 err_req_irq:
+err_req_resource:
 err_add_udc:
 	clk_put(otg_clock);
 	return retval;
@@ -1220,7 +1227,7 @@ static int s3c_udc_remove(struct platform_device *pdev)
 	remove_proc_files();
 	usb_gadget_unregister_driver(dev->driver);
 
-	free_irq(IRQ_USB_HSOTG, dev);
+	free_irq(EXYNOS4_IRQ_USB_HSOTG, dev);
 
 	platform_set_drvdata(pdev, 0);
 
@@ -1250,7 +1257,7 @@ static int s3c_udc_suspend(struct platform_device *pdev, pm_message_t state)
 				spin_unlock(&ep->dev->lock);
 		}
 
-		disable_irq(IRQ_USB_HSOTG);
+		disable_irq(EXYNOS4_IRQ_USB_HSOTG);
 		udc_disable(dev);
 		clk_disable(otg_clock);
 	}
@@ -1265,7 +1272,7 @@ static int s3c_udc_resume(struct platform_device *pdev)
 	if (dev->driver) {
 		clk_enable(otg_clock);
 		udc_reinit(dev);
-		enable_irq(IRQ_USB_HSOTG);
+		enable_irq(EXYNOS4_IRQ_USB_HSOTG);
 		udc_enable(dev);
 
 		if (dev->driver->resume)

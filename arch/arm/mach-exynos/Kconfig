@@ -303,7 +303,7 @@ config MACH_FXI_C210
   	select S5P_DEV_MFC
   	select S5P_DEV_TV
   	select S5P_DEV_USB_EHCI
-  	select S3C_DEV_USB_HSOTG
+	select S5P_DEV_USB_HSDEVICE
   	select SAMSUNG_DEV_BACKLIGHT
   	select SAMSUNG_DEV_PWM
   	select EXYNOS4_DEV_DMA

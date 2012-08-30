@@ -143,7 +143,7 @@ static int __init msg_do_config(struct usb_configuration *c)
 static struct usb_configuration msg_config_driver = {
 	.label			= "Linux File-Backed Storage",
 	.bConfigurationValue	= 1,
-	.bmAttributes		= USB_CONFIG_ATT_SELFPOWER,
+	.bmAttributes		= USB_CONFIG_ATT_ONE | USB_CONFIG_ATT_SELFPOWER,
 };
 
 
@@ -170,7 +170,7 @@ static struct usb_composite_driver msg_driver = {
 	.name		= "g_mass_storage",
 	.dev		= &msg_device_desc,
 	.iProduct	= DRIVER_DESC,
-	.max_speed	= USB_SPEED_SUPER,
+	.max_speed	= USB_SPEED_HIGH,
 	.needs_serial	= 1,
 };
 

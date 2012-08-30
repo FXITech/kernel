@@ -30,6 +30,8 @@
 #define S5P_VA_L2CC		S3C_ADDR(0x02600000)
 
 #define S5P_VA_COMBINER_BASE	S3C_ADDR(0x02700000)
+
+
 #define S5P_VA_COMBINER(x)	(S5P_VA_COMBINER_BASE + ((x) >> 2) * 0x10)
 
 #define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
@@ -58,6 +60,7 @@
 #define S3C_UART_OFFSET		(0x400)
 #endif
 
+#define S3C_VA_HSDEVICE	S3C_ADDR(0x02B00000)
 #include <plat/map-s3c.h>
 
 #endif /* __ASM_PLAT_MAP_S5P_H */

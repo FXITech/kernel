@@ -53,6 +53,7 @@
 #include <plat/mfc.h>
 #include <plat/udc-hs.h>
 #include <plat/hdmi.h>
+#include <plat/otg.h>
 
 #include <mach/ohci.h>
 #include <mach/map.h>
@@ -116,8 +117,8 @@ static struct regulator_consumer_supply ldo1_consumer[] = {
   REGULATOR_SUPPLY("vdd_osc", "exynos4-hdmi"),
 };
 static struct regulator_consumer_supply ldo3_consumer[] = {
-  REGULATOR_SUPPLY("vusb_d", "s3c-hsotg"), /* USB */
-  REGULATOR_SUPPLY("vusb_a", "s3c-hsotg"), /* USB */ // FIXME
+  REGULATOR_SUPPLY("vusb_d", "s3c-udc"), /* USB */
+  REGULATOR_SUPPLY("vusb_a", "s3c-udc"), /* USB */
   REGULATOR_SUPPLY("vdd", "exynos4-hdmi"), /* HDMI */
   REGULATOR_SUPPLY("hdmi-en", "exynos4-hdmi"), /* HDMI */
   REGULATOR_SUPPLY("vdd_pll", "exynos4-hdmi"), /* HDMI */
@@ -592,7 +593,7 @@ static void __init fxi_c210_ohci_init(void)
 }
 
 /* USB OTG */
-static struct s3c_hsotg_plat fxi_c210_hsotg_pdata;
+static struct s5p_otg_platdata fxi_c210_otg_pdata;
 
 static struct gpio_led fxi_c210_gpio_leds[] = {
 	{
@@ -816,8 +817,8 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_i2c1,
 	&s3c_device_rtc,
 	&s3c_device_wdt,
+	&s3c_device_usbgadget,
 	&fxi_c210_device_chardev,
-	&s3c_device_usb_hsotg,
 	&s5p_device_ehci,
 	&s5p_device_fimc0,
 	&s5p_device_fimc1,
@@ -829,7 +830,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s5p_device_g3d,
 	&s5p_device_hdmi,
 	&s5p_device_i2c_hdmiphy,
-//	&s5p_device_jpeg,
 	&s5p_device_mfc,
 	&s5p_device_mfc_l,
 	&s5p_device_mfc_r,
@@ -837,7 +837,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&samsung_asoc_dma,
 	&exynos4_device_ohci,
 	&fxi_c210_device_gpiokeys,
-	//&fxi_c210_lcd_hv070wsa,
 	&fxi_c210_leds_gpio,
 	&fxi_c210_device_bluetooth,
 	&exynos4_device_tmu,
@@ -942,20 +941,15 @@ static void __init fxi_c210_machine_init(void)
 	clk_xusbxti.rate = 24000000;
 	fxi_c210_ehci_init();
 	fxi_c210_ohci_init();
-	s3c_hsotg_set_platdata(&fxi_c210_hsotg_pdata);
+	s5p_otg_set_platdata(&fxi_c210_otg_pdata);
 
 	s5p_tv_setup();
 	s5p_i2c_hdmiphy_set_platdata(NULL);
 	s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
 
-//	s5p_fimd0_set_platdata(&fxi_c210_lcd_pdata);
-
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
 
-
 	samsung_bl_set(&fxi_c210_bl_gpio_info, &fxi_c210_bl_data);
-
-//	fxi_c210_bt_setup();
 }
 
 MACHINE_START(FXI_C210, "FXI_C210")

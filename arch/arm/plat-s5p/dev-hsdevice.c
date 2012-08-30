@@ -22,13 +22,13 @@
 /* USB Device (Gadget)*/
 static struct resource s3c_usbgadget_resource[] = {
 	[0] = {
-		.start	= S5P_PA_HSDEVICE,
-		.end	= S5P_PA_HSDEVICE + SZ_64K - 1,
+		.start	= EXYNOS4_PA_HSDEVICE,
+		.end	= EXYNOS4_PA_HSDEVICE + SZ_64K - 1,
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= IRQ_USB_HSOTG,
-		.end	= IRQ_USB_HSOTG,
+		.start	= EXYNOS4_IRQ_USB_HSOTG,
+		.end	= EXYNOS4_IRQ_USB_HSOTG,
 		.flags	= IORESOURCE_IRQ,
 	}
 };

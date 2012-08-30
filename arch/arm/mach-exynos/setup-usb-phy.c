@@ -18,6 +18,7 @@
 #include <mach/regs-usb-phy.h>
 #include <plat/cpu.h>
 #include <plat/usb-phy.h>
+#include <linux/usb/ch9.h> /* due to usbctrl_request at the end */
 
 static atomic_t host_usage;
 
@@ -83,7 +84,8 @@ static int exynos4_usb_phy0_init(struct platform_device *pdev)
 		EXYNOS4_PHYCLK);
 	writel((readl(EXYNOS4_RSTCON) & ~(0x3<<1))|(0x1<<0),
 		EXYNOS4_RSTCON);
-	udelay(10);
+	/* manual says "at least 10us", so 20 ought to be fine */
+	udelay(20);
 	writel(readl(EXYNOS4_RSTCON) & ~(0x7<<0),
 		EXYNOS4_RSTCON);
 	udelay(80);
@@ -207,3 +209,8 @@ int s5p_usb_phy_exit(struct platform_device *pdev, int type)
 
 	return -EINVAL;
 }
+
+/* USB Control request data struct must be located here for DMA transfer */
+/* Note: Reintroduced due to using the old s3c otg driver (again x 2) */
+struct usb_ctrlrequest usb_ctrl __attribute__((aligned(8)));
+EXPORT_SYMBOL(usb_ctrl);

@@ -554,6 +554,7 @@ static int s3c_queue(struct usb_ep *_ep, struct usb_request *_req,
 
 	ep_num = ep_index(ep);
 	dev = ep->dev;
+
 	if (unlikely(!dev->driver || dev->gadget.speed == USB_SPEED_UNKNOWN)) {
 		DEBUG("%s: bogus device state %p\n", __func__, dev->driver);
 		return -ESHUTDOWN;
