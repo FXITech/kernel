@@ -28,16 +28,7 @@
 #include <linux/fxifb.h>
 #include <linux/dma-mapping.h>
 
-#include <../drivers/gpu/arm/ump/include/ump_kernel_interface_ref_drv.h>
-
 #include "s5p-tv/mixer.h"
-
-#define BYTES_PER_PIXEL 4
-#define MAX_BUFFER_NUM 3
-#define FXIFB_GET_FB_UMP_SECURE_ID_0      _IOWR('m', 310, unsigned int)
-#define FXIFB_GET_FB_UMP_SECURE_ID_1      _IOWR('m', 311, unsigned int)
-#define FXIFB_GET_FB_UMP_SECURE_ID_2      _IOWR('m', 312, unsigned int)
-static ump_dd_handle       ump_wrapped_buffer[MAX_BUFFER_NUM];
 
 static int debug = 1;
 module_param(debug, int, 0644);
@@ -113,85 +104,6 @@ static struct fmt_desc fmt_conv_table[] = {
 	/* TODO: add more format descriptors */
 };
 
-static struct fxifb_platform_data fxi_fb_default_pdata = {
-	.xres = 1920,
-	.yres = 1080,
-	.virtual_x = 1920,
-	.virtual_y = 1080,
-	.max_bpp = 32,
-};
-
-static int fxifb_unmap_video_memory(struct device *dev, struct fb_info *fbi)
-{
-	struct fb_fix_screeninfo *fix = &fbi->fix;
-
-	if (fix->smem_start) {
-
-		dma_free_coherent(dev, fix->smem_len, fbi->screen_base, fix->smem_start);
-
-		fix->smem_start = 0;
-		fix->smem_len = 0;
-		printk(KERN_DEBUG "fxifb: video memory released\n");
-	}
-	return 0;
-}
-
-static int fxifb_ump_wrapper(struct fb_info *info, int id)
-{
-	ump_dd_physical_block ump_memory_description;
-	unsigned int buffer_size;
-	buffer_size = info->fix.smem_len;
-	ump_memory_description.addr = info->fix.smem_start;
-	ump_memory_description.size = buffer_size;
-	ump_wrapped_buffer[id] = ump_dd_handle_create_from_phys_blocks(&ump_memory_description, 1);
-	return 0;
-}
-
-static int fxi_fb_alloc_memory(struct device *dev, struct fxifb_platform_data *fxiplat, struct fb_info *fbi)
-{
-#if 0
-	unsigned int size;
-	dma_addr_t map_dma;
-	struct vb2_fb_data *data;
-
-	data = fbi->par;
-
-	printk(KERN_DEBUG "fxifb: allocating memory for display for dev\n");
-
-	size = fxiplat->virtual_y * fxiplat->virtual_x * BYTES_PER_PIXEL;
-	printk(KERN_DEBUG "fxifb: size = %x\n", size);
-
-	fbi->fix.smem_len = size;
-	printk(KERN_DEBUG "fxifb: want %u bytes for window, actually getting: %u\n",
-	       fbi->fix.smem_len, PAGE_ALIGN(fbi->fix.smem_len));
-	dev->coherent_dma_mask = ~0L;
-	data->vaddr = dma_alloc_writecombine(dev,
-						 PAGE_ALIGN(fbi->fix.smem_len),
-						 &map_dma, GFP_KERNEL);
-
-
-
-	printk(KERN_DEBUG "fxifb: Screen_base %x", (unsigned int)data->vaddr);
-	if (!data->vaddr)
-		return -ENOMEM;
-	else
-		fbi->fix.smem_start = map_dma;
-		printk(KERN_DEBUG "[fxifb] dma: 0x%08x, cpu: 0x%08x, size: 0x%08x\n",
-			 (unsigned int)fbi->fix.smem_start,
-			 (unsigned int)data->vaddr, fbi->fix.smem_len);
-
-	memset(data->vaddr, 0, fbi->fix.smem_len);
-
-	/* Setup UMP for Mali */
-	if (fxifb_ump_wrapper(fbi, fbi->node)) {
-		printk(KERN_DEBUG "[fxib] : Wrapped UMP memory : %x\n", (unsigned int)ump_wrapped_buffer);
-		fxifb_unmap_video_memory(dev, fbi);
-		return 0;
-	}
-#endif
-	return 0;
-}
-
 static int fxifb_wait_for_vsync(struct fb_info *info, u32 crtc)
 {
 	struct vb2_fb_data *data = info->par;
@@ -214,40 +126,6 @@ static int fxifb_ioctl(struct fb_info *info, unsigned int cmd,
 	int ret = 0;
 
 	switch (cmd) {
-#if 0
-	case FXIFB_GET_FB_UMP_SECURE_ID_0: {
-		u32 __user *psecureid = (u32 __user *) arg;
-		ump_secure_id secure_id;
-
-		printk(KERN_DEBUG "fxifb: ump_dd_secure_id_get_0\n");
-		secure_id = ump_dd_secure_id_get(ump_wrapped_buffer[0]);
-		printk(KERN_DEBUG "fxifb: Saving secure id 0x%x in userptr %p\n", (unsigned int)secure_id, psecureid);
-		printk(KERN_DEBUG "fxifb: Saving secure id 0x%x in userptr %p\n", (unsigned int)secure_id, psecureid);
-		return put_user((unsigned int)secure_id, psecureid);
-	}
-
-	case FXIFB_GET_FB_UMP_SECURE_ID_1: {
-		u32 __user *psecureid = (u32 __user *) arg;
-		ump_secure_id secure_id = 0;
-
-		printk(KERN_DEBUG "fxifb: ump_dd_secure_id_get_1\n");
-		secure_id = ump_dd_secure_id_get(ump_wrapped_buffer[1]);
-		printk(KERN_DEBUG "fxifb: Saving secure id 0x%x in userptr %p\n", (unsigned int)secure_id, psecureid);
-		printk(KERN_DEBUG "fxifb: Saving secure id 0x%x in userptr %p\n", (unsigned int)secure_id, psecureid);
-		return put_user((unsigned int)secure_id, psecureid);
-	}
-
-	case FXIFB_GET_FB_UMP_SECURE_ID_2: {
-		u32 __user *psecureid = (u32 __user *) arg;
-		ump_secure_id secure_id = 0;
-
-		printk(KERN_DEBUG "fxifb: ump_dd_secure_id_get_2\n");
-		secure_id = ump_dd_secure_id_get(ump_wrapped_buffer[2]);
-		printk(KERN_DEBUG "fxifb: Saving secure id 0x%x in userptr %p\n", (unsigned int)secure_id, psecureid);
-		printk(KERN_DEBUG "fxifb: Saving secure id 0x%x in userptr %p\n", (unsigned int)secure_id, psecureid);
-		return put_user((unsigned int)secure_id, psecureid);
-	}
-#endif
 
 	case FBIO_WAITFORVSYNC:
 		if (get_user(crtc, (u32 __user *)arg)) {
@@ -832,11 +710,6 @@ void *vb2_fb_register(struct vb2_queue *q, struct video_device *vfd)
 	info->fbops = &vb2_fb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->screen_base = NULL;
-
-	printk(KERN_INFO "fb%d: calling: fxi_fb_alloc_memory\n",
-	       info->node);
-
-	fxi_fb_alloc_memory(&vfd->dev, &fxi_fb_default_pdata, info);
 
 	ret = register_framebuffer(info);
 	if (ret)
