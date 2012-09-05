@@ -41,6 +41,39 @@ MODULE_AUTHOR("Tomasz Stanislawski, <t.stanislaws@samsung.com>");
 MODULE_DESCRIPTION("Samsung HDMI");
 MODULE_LICENSE("GPL");
 
+#define HDMI_INFOFRAME_VSI 0x81
+#define HDMI_INFOFRAME_AVI 0x82
+#define HDMI_INFOFRAME_SPD 0x83
+#define HDMI_INFOFRAME_AUI 0x84
+#define HDMI_INFOFRAME_MPG 0x85
+
+/* AVI infoframe */
+/* Byte 0 */
+#define HDMI_AVI_RGB     (0 << 5)
+#define HDMI_AVI_YUV_444 (2 << 5)
+
+/* Active format aspect ratio valid */
+#define HDMI_AVI_ACTIVE_FORMAT_VALID (1 << 4)
+
+/* Scan information */
+#define HDMI_AVI_OVERSCAN (1)
+#define HDMI_AVI_UNDERSCAN (2)
+
+/* Byte 1 */
+/* Colorimetry */
+#define HDMI_AVI_COLORIMETRY_601 (1 << 6)
+#define HDMI_AVI_COLORIMETRY_709 (2 << 6)
+
+/* Picture aspect ratio */
+#define HDMI_AVI_PIC_RATIO_16_9 (2 << 4)
+
+/* Active format aspect ratio */
+#define HDMI_AVI_FORMAT_ASPECT_SAME 0x8
+#define HDMI_AVI_FORMAT_ASPECT_4_3 0x9
+#define HDMI_AVI_FORMAT_ASPECT_16_9 0xA
+#define HDMI_AVI_FORMAT_ASPECT_14_9 0xB
+
+
 /* default preset configured on probe */
 #define HDMI_DEFAULT_PRESET V4L2_DV_1080P60
 
@@ -126,6 +159,7 @@ struct hdmi_preset_conf {
 	struct hdmi_core_regs core;
 	struct hdmi_tg_regs tg;
 	struct v4l2_mbus_framefmt mbus_fmt;
+	int vic_16_9; /* Video identification code */
 };
 
 static struct platform_device_id hdmi_driver_types[] = {
@@ -258,7 +292,7 @@ static void hdmi_reg_acr(struct hdmi_device *hdev, u8 *acr)
 
 static void hdmi_audio_init(struct hdmi_device *hdev)
 {
-	u32 sample_rate, bits_per_sample, frame_size_code, repcnt, wl, valuen, cts;
+	u32 sample_rate, bits_per_sample, frame_size_code, valuen, cts;
 	u32 data_num, bit_ch, sample_frq;
 	u32 val;
 	u8 acr[7];
@@ -356,7 +390,7 @@ static void hdmi_reg_init(struct hdmi_device *hdev)
 {
 	/* enable HPD interrupts */
 	hdmi_write_mask(hdev, HDMI_INTC_CON, ~0, HDMI_INTC_EN_GLOBAL |
-		HDMI_INTC_EN_HPD_PLUG | HDMI_INTC_EN_HPD_UNPLUG);
+			HDMI_INTC_EN_HPD_PLUG | HDMI_INTC_EN_HPD_UNPLUG);
 	/* choose HDMI mode */
 	hdmi_write_mask(hdev, HDMI_MODE_SEL,
 		HDMI_MODE_HDMI_EN, HDMI_MODE_MASK);
@@ -431,11 +465,64 @@ static void hdmi_timing_apply(struct hdmi_device *hdev,
 	hdmi_writeb(hdev, HDMI_TG_FIELD_BOT_HDMI_H, tg->field_bot_hdmi_h);
 }
 
+static u8 hdmi_checksum(u8 sum, int size, u8 *data)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		sum += data[i];
+
+	return 0x100 - sum;
+}
+
+static void hdmi_infoframe(struct hdmi_device *hdev,
+			   u8 type, u8 version, u8 length, u8 *data)
+{
+	u32 start_addr = 0, checksum_addr = 0;
+	u8 checksum;
+	int i;
+
+	switch (type) {
+	case HDMI_INFOFRAME_AVI:
+		checksum_addr = HDMI_AVI_CHECK_SUM;
+		start_addr = HDMI_AVI_DATA;
+		break;
+	case HDMI_INFOFRAME_SPD:
+		checksum_addr = HDMI_SPD_DATA;
+		start_addr = HDMI_SPD_DATA + 4;
+		/* write header */
+		hdmi_writeb(hdev, HDMI_SPD_HEADER, type);
+		hdmi_writeb(hdev, HDMI_SPD_HEADER + 4, version);
+		hdmi_writeb(hdev, HDMI_SPD_HEADER + 8, length);
+		break;
+	case HDMI_INFOFRAME_AUI:
+		checksum_addr = HDMI_AUI_CHECKSUM;
+		start_addr = HDMI_AUI_DATA_1;
+		break;
+	case HDMI_INFOFRAME_MPG:
+		checksum_addr = HDMI_MPG_CHECK_SUM;
+		start_addr = HDMI_MPG_DATA;
+		break;
+	default:
+		printk(KERN_ERR "%s: Unknown frame type: %d\n", __func__, type);
+		return;
+	}
+
+	checksum = hdmi_checksum(type + version + length, length, data);
+	hdmi_writeb(hdev, checksum_addr, checksum);
+
+	for (i = 0; i < length; i++)
+		hdmi_writeb(hdev, start_addr + (i * 4), data[i]);
+}
+
 static int hdmi_conf_apply(struct hdmi_device *hdmi_dev)
 {
 	struct device *dev = hdmi_dev->dev;
 	const struct hdmi_preset_conf *conf = hdmi_dev->cur_conf;
 	struct v4l2_dv_preset preset;
+	u8 avi_data[13] = {0};
+	u8 aui_data[10] = {0};
+	u8 color_type;
 	int ret;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -466,6 +553,24 @@ static int hdmi_conf_apply(struct hdmi_device *hdmi_dev)
 	/* setting core registers */
 	hdmi_timing_apply(hdmi_dev, conf);
 	hdmi_audio_control(hdmi_dev, true);
+
+	hdmi_write_mask(hdmi_dev, HDMI_GCP_CON, 0,
+			HDMI_GCP_CON_EN_1ST_VSYNC | HDMI_GCP_CON_EN_2ST_VSYNC);
+
+	color_type = HDMI_AVI_RGB;
+	if (conf->mbus_fmt.colorspace != V4L2_COLORSPACE_SRGB)
+		color_type = HDMI_AVI_YUV_444;
+
+	avi_data[0] =
+		color_type | HDMI_AVI_ACTIVE_FORMAT_VALID | HDMI_AVI_UNDERSCAN;
+	avi_data[1] = HDMI_AVI_COLORIMETRY_709 | HDMI_AVI_PIC_RATIO_16_9 |
+		HDMI_AVI_FORMAT_ASPECT_SAME;
+	avi_data[3] = conf->vic_16_9;
+	hdmi_infoframe(hdmi_dev, HDMI_INFOFRAME_AVI, 2, 13, avi_data);
+
+	hdmi_infoframe(hdmi_dev, HDMI_INFOFRAME_AUI, 1, 10, aui_data);
+
+	hdmi_writeb(hdmi_dev, HDMI_AVI_CON, 0x02);
 
 	return 0;
 }
@@ -589,6 +694,7 @@ static const struct hdmi_preset_conf hdmi_conf_480p = {
 		.field = V4L2_FIELD_NONE,
 		.colorspace = V4L2_COLORSPACE_SRGB,
 	},
+	.vic_16_9 = 3,
 };
 
 static const struct hdmi_preset_conf hdmi_conf_720p50 = {
@@ -622,6 +728,7 @@ static const struct hdmi_preset_conf hdmi_conf_720p50 = {
 		.field = V4L2_FIELD_NONE,
 		.colorspace = V4L2_COLORSPACE_SRGB,
 	},
+	.vic_16_9 = 19,
 };
 
 static const struct hdmi_preset_conf hdmi_conf_720p60 = {
@@ -655,6 +762,7 @@ static const struct hdmi_preset_conf hdmi_conf_720p60 = {
 		.field = V4L2_FIELD_NONE,
 		.colorspace = V4L2_COLORSPACE_SRGB,
 	},
+	.vic_16_9 = 4,
 };
 
 static const struct hdmi_preset_conf hdmi_conf_1080p50 = {
@@ -688,6 +796,7 @@ static const struct hdmi_preset_conf hdmi_conf_1080p50 = {
 		.field = V4L2_FIELD_NONE,
 		.colorspace = V4L2_COLORSPACE_SRGB,
 	},
+	.vic_16_9 = 31,
 };
 
 static const struct hdmi_preset_conf hdmi_conf_1080p60 = {
@@ -721,6 +830,7 @@ static const struct hdmi_preset_conf hdmi_conf_1080p60 = {
 		.field = V4L2_FIELD_NONE,
 		.colorspace = V4L2_COLORSPACE_SRGB,
 	},
+	.vic_16_9 = 16,
 };
 
 static const struct {
@@ -728,7 +838,9 @@ static const struct {
 	const struct hdmi_preset_conf *conf;
 } hdmi_conf[] = {
 	{ V4L2_DV_480P59_94, &hdmi_conf_480p },
+	{ V4L2_DV_720P50, &hdmi_conf_720p50 },
 	{ V4L2_DV_720P59_94, &hdmi_conf_720p60 },
+	{ V4L2_DV_720P60, &hdmi_conf_720p60 },
 	{ V4L2_DV_1080P50, &hdmi_conf_1080p50 },
 	{ V4L2_DV_1080P30, &hdmi_conf_1080p60 },
 	{ V4L2_DV_1080P60, &hdmi_conf_1080p60 },
