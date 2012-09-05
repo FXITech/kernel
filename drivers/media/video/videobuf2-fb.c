@@ -61,8 +61,8 @@ struct vb2_fb_data {
 
 static int vb2_fb_activate(struct fb_info *info);
 static int vb2_fb_deactivate(struct fb_info *info);
-static int vb2_fb_start(struct fb_info *info);
 static int vb2_fb_stop(struct fb_info *info);
+static int vb2_fb_blank(int blank_mode, struct fb_info *info);
 
 struct fmt_desc {
 	__u32			fourcc;
@@ -252,7 +252,7 @@ static int fxifb_set_par(struct fb_info *info)
 		vb2_fb_deactivate(info);
 		vb2_fb_activate(info);
 		vb2_drv_unlock(data->q);
-		vb2_fb_start(info);
+		vb2_fb_blank(FB_BLANK_UNBLANK, info);
 	}
 	return 0;
 }
@@ -299,13 +299,6 @@ static int vb2_fb_activate(struct fb_info *info)
 			&data->fake_file, data->fake_file.private_data, &preset);
 		if (ret)
 			printk(KERN_ERR "fb emu: Setting dv preset failed: %d\n", ret);
-		/* Make sure the buffer size is changed to the new resolution */
-		data->vfd->ioctl_ops->vidioc_g_fmt_vid_out_mplane(
-			&data->fake_file, data->fake_file.private_data, &fmt);
-		fmt.fmt.pix.width = info->var.xres;
-		fmt.fmt.pix.height = info->var.yres;
-		data->vfd->ioctl_ops->vidioc_s_fmt_vid_out_mplane(
-			&data->fake_file, data->fake_file.private_data, &fmt);
 	}
 
 	/*
@@ -431,12 +424,12 @@ static int vb2_fb_deactivate(struct fb_info *info)
 {
 	struct vb2_fb_data *data = info->par;
 
+	vb2_fb_stop(info);
+
 	info->screen_base = NULL;
 	info->screen_size = 0;
 	data->blank = 1;
-	data->streaming = 0;
 
-	vb2_fb_stop(info);
 	return data->vfd->fops->release(&data->fake_file);
 }
 
@@ -490,7 +483,7 @@ static int vb2_fb_start(struct fb_info *info)
 }
 
 /**
- * vb2_fb_start() - stop displaying video buffer
+ * vb2_fb_stop() - stop displaying video buffer
  * @info:	framebuffer vb2 emulator data
  * This function stops streaming on the video driver.
  */
@@ -542,11 +535,7 @@ static int vb2_fb_open(struct fb_info *info, int user)
 	/*
          * Start emulation
          */
-	if (data->blank) {
-		ret = vb2_fb_start(info);
-		if (ret == 0)
-			data->blank = 0;
-	}
+	vb2_fb_blank(FB_BLANK_UNBLANK, info);
 
 	return ret;
 }
