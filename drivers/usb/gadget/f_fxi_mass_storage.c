@@ -295,6 +295,7 @@
 #include <linux/usb/composite.h>
 
 #include "gadget_chips.h"
+#include "../../../arch/arm/mach-exynos/fxi-fxiid.h"
 
 void fxi_request(unsigned long addr, void *buf, unsigned long type, int size);
 
@@ -651,6 +652,7 @@ static int fsg_setup(struct usb_function *f,
 		req->length = min((u16)1, w_length);
 		return ep0_queue(fsg->common);
 	}
+
 
 	VDBG(fsg,
 	     "unknown class-specific control req %02x.%02x v%04x i%04x l%u\n",
@@ -2829,8 +2831,25 @@ autoconf_fail:
 
 /****************************** ADD FUNCTION ******************************/
 
-static struct usb_gadget_strings *fsg_strings_array[] = {
-	&fsg_stringtab,
+#define FXI_STRING_MANUFACTURER	1
+#define FXI_STRING_PRODUCT 2
+#define FXI_STRING_SERIALNUM 3
+
+struct fxi_product_info fxi_info;
+static struct usb_string fxi_product_strings [] = {
+	{ FXI_STRING_MANUFACTURER, fxi_info.iManufacturer, },
+	{ FXI_STRING_PRODUCT, fxi_info.iProduct, },
+	{ FXI_STRING_SERIALNUM, fxi_info.iSerial, },
+	{  }		/* end of list */
+};
+
+static struct usb_gadget_strings fxi_stringtab = {
+	.language = 0x0409,
+	.strings = fxi_product_strings,
+};
+
+static struct usb_gadget_strings *fxi_strings_array[] = {
+	&fxi_stringtab,
 	NULL,
 };
 
@@ -2846,7 +2865,7 @@ static int fsg_bind_config(struct usb_composite_dev *cdev,
 		return -ENOMEM;
 
 	fsg->function.name        = FSG_DRIVER_DESC;
-	fsg->function.strings     = fsg_strings_array;
+	fsg->function.strings     = fxi_strings_array;
 	fsg->function.bind        = fsg_bind;
 	fsg->function.unbind      = fsg_unbind;
 	fsg->function.setup       = fsg_setup;
@@ -2924,7 +2943,7 @@ fsg_config_from_params(struct fsg_config *cfg,
 	for (i = 0, lun = cfg->luns; i < cfg->nluns; ++i, ++lun) {
 		lun->ro = false;
 		lun->cdrom = false;
-		lun->removable = false;
+		lun->removable = true;
 	}
 
 	/* Let MSF use defaults */

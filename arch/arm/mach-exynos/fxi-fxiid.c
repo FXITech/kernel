@@ -13,6 +13,8 @@
 #include <plat/gpio-cfg.h>
 #include <asm/gpio.h>
 
+#include "fxi-fxiid.h"
+
 #define PIN EXYNOS4_GPK3(1)
 #define READ_MEMORY 0xF0
 #define PAGESIZE 32
@@ -510,6 +512,30 @@ static void __exit fxi_fxiid_exit(void)
 
     platform_driver_unregister(&fxi_fxiid_driver);
 }
+
+#define FXI_MANUFACTURER "FXI Technologies AS"
+#define FXI_PRODUCT "Cotton Candy"
+
+void fxi_get_product_info(struct fxi_product_info *info)
+{
+	sprintf(info->iSerial, \
+		"%02x%02x%02x%02x%02x%02x%02x%02x" \
+		"%02x%02x%02x%02x%02x%02x%02x%02x" \
+		", "\
+		"0x%02x%02x%02x%02x\n",
+		uuid[0], uuid[1], uuid[2], uuid[3],
+		uuid[4], uuid[5], uuid[6], uuid[7],
+		uuid[8], uuid[9], uuid[10], uuid[11],
+		uuid[12], uuid[13], uuid[14], uuid[15],
+		revision[0], revision[1], revision[2], revision[3]);
+		
+	info->idVendor = FXI_VENDOR_ID;
+	info->idProduct = *((u16*) &revision[0]);
+	strcpy(info->iManufacturer, FXI_MANUFACTURER);
+	strcpy(info->iProduct, FXI_PRODUCT);
+}
+
+EXPORT_SYMBOL(fxi_get_product_info);
 
 module_init(fxi_fxiid_init);
 module_exit(fxi_fxiid_exit);

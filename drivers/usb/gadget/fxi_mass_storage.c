@@ -44,7 +44,7 @@
 
 /*-------------------------------------------------------------------------*/
 
-#define DRIVER_DESC		"Mass Storage Gadget"
+#define DRIVER_DESC		"Cotton Candy"
 #define DRIVER_VERSION		"2009/09/11"
 
 /*-------------------------------------------------------------------------*/
@@ -62,6 +62,7 @@
 #include "config.c"
 #include "epautoconf.c"
 #include "f_fxi_mass_storage.c"
+#include "../../../arch/arm/mach-exynos/fxi-fxiid.h"
 
 /*-------------------------------------------------------------------------*/
 
@@ -73,8 +74,9 @@ static struct usb_device_descriptor msg_device_desc = {
 	.bDeviceClass =		USB_CLASS_PER_INTERFACE,
 
 	/* Vendor and product id can be overridden by module parameters.  */
-	.idVendor =		cpu_to_le16(FSG_VENDOR_ID),
-	.idProduct =		cpu_to_le16(FSG_PRODUCT_ID),
+	
+	.idVendor =		FXI_VENDOR_ID,
+	.idProduct =		0,
 
 	.bNumConfigurations =	1,
 };
@@ -99,8 +101,10 @@ static const struct usb_descriptor_header *otg_desc[] = {
 /****************************** Configurations ******************************/
 
 static struct fsg_module_parameters mod_data = {
-	.stall = 1
+	.stall = 1,
+	.removable = 1
 };
+
 FSG_MODULE_PARAMETERS(/* no prefix */, mod_data);
 
 static unsigned long msg_registered;
@@ -180,6 +184,16 @@ MODULE_LICENSE("GPL");
 
 static int __init msg_init(void)
 {
+	struct usb_device_descriptor *descriptor = msg_driver.dev;
+	
+	fxi_get_product_info(&fxi_info);
+	
+	descriptor->idVendor = fxi_info.idVendor;
+	descriptor->idProduct = fxi_info.idProduct;
+	descriptor->iSerialNumber = FXI_STRING_SERIALNUM;
+	descriptor->iManufacturer = FXI_STRING_MANUFACTURER;
+	descriptor->iProduct = FXI_STRING_PRODUCT;
+	
 	return usb_composite_probe(&msg_driver, msg_bind);
 }
 module_init(msg_init);
