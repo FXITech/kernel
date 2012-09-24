@@ -425,6 +425,7 @@ struct combiner_chip_data {
 	unsigned int irq_offset;
 	unsigned int irq_mask;
 	void __iomem *base;
+	unsigned int parent_irq;
 };
 
 static struct irq_domain *combiner_irq_domain;
@@ -481,10 +482,30 @@ static void combiner_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
 	chained_irq_exit(chip, desc);
 }
 
+#ifdef CONFIG_SMP
+static int combiner_set_affinity(struct irq_data *d,
+				const struct cpumask *mask_val, bool force)
+{
+	struct combiner_chip_data *chip_data = irq_data_get_irq_chip_data(d);
+	struct irq_chip *chip = irq_get_chip(chip_data->parent_irq);
+	struct irq_data *data = irq_get_irq_data(chip_data->parent_irq);
+
+	if (chip && chip->irq_set_affinity)
+		return chip->irq_set_affinity(data, mask_val, force);
+	else
+		return -EINVAL;
+}
+
+#endif
+
 static struct irq_chip combiner_chip = {
 	.name		= "COMBINER",
 	.irq_mask	= combiner_mask_irq,
 	.irq_unmask	= combiner_unmask_irq,
+#ifdef CONFIG_SMP
+	.irq_set_affinity = combiner_set_affinity,
+#endif
+	
 };
 
 static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int irq)
@@ -504,12 +525,13 @@ static void __init combiner_cascade_irq(unsigned int combiner_nr, unsigned int i
 }
 
 static void __init combiner_init_one(unsigned int combiner_nr,
-						void __iomem *base)
+				void __iomem *base, unsigned int irq)
 {
 	combiner_data[combiner_nr].base = base;
 	combiner_data[combiner_nr].irq_offset = irq_find_mapping(
 		combiner_irq_domain, combiner_nr * MAX_IRQ_IN_COMBINER);
 	combiner_data[combiner_nr].irq_mask = 0xff << ((combiner_nr % 4) << 3);
+	combiner_data[combiner_nr].parent_irq = irq;
 
 	/* Disable all interrupts */
 
@@ -588,8 +610,8 @@ void __init combiner_init(void __iomem *combiner_base, struct device_node *np)
 	}
 
 	for (i = 0; i < max_nr; i++) {
-		combiner_init_one(i, combiner_base + (i >> 2) * 0x10);
 		irq = np ? irq_of_parse_and_map(np, i) : IRQ_SPI(i);
+		combiner_init_one(i, combiner_base + (i >> 2) * 0x10, irq);
 		combiner_cascade_irq(i, irq);
 	}
 }
