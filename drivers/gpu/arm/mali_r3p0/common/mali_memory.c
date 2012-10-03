@@ -482,7 +482,7 @@ static mali_physical_memory_allocation_result ump_memory_commit(void* ctx, mali_
 
 	for(i=0; i<nr_blocks; ++i)
 	{
-		MALI_DEBUG_PRINT(4, ("Mapping in 0x%08x size %d\n", ump_blocks[i].addr , ump_blocks[i].size));
+		MALI_DEBUG_PRINT(6, ("Mapping in 0x%08x size %d\n", ump_blocks[i].addr , ump_blocks[i].size));
 		if (_MALI_OSK_ERR_OK != mali_allocation_engine_map_physical(engine, descriptor, *offset, ump_blocks[i].addr , 0, ump_blocks[i].size ))
 		{
 			u32 size_allocated = *offset - ret_allocation->initial_offset;
