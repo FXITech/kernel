@@ -17,8 +17,6 @@
 
 #define PIN EXYNOS4_GPK3(1)
 #define READ_MEMORY 0xF0
-#define PAGESIZE 32
-#define SLICE_SIZE 8
 #define WRITE_SCRATCH 0x0F
 #define COPY_SCRATCH 0x55
 #define READ_SCRATCH 0xAA
@@ -47,8 +45,8 @@ static void 	fxi_w1_write_byte(u32 pin, u8 data);
 static u8 		fxi_w1_read_byte(u32 pin);
 static int 		fxi_w1_write_8(u8 *buf, u8 off);
 static ssize_t fxi_w1_read_protect1(struct device *dev, struct device_attribute *attr, char *buf);
-static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute *attr, char *buf, size_t count);
-static ssize_t 		fxi_w1_write_page1(struct device *dev, struct device_attribute *attr, char *buf, size_t count);
+static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
+static ssize_t fxi_w1_write_page1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static ssize_t 		fxi_w1_read_page1(struct device *dev, struct device_attribute *attr, char *buf);
 
 static 	int 	__init fxi_fxiid_init(void);
@@ -190,7 +188,8 @@ static ssize_t fxi_w1_read_protect1(struct device *dev, struct device_attribute 
 	return sprintf(buf, "%02x\n", wp);
 }
 
-static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute *attr, char *buf, size_t count){
+static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
 
 	u8 tempwp[8];
 	int i;
@@ -208,9 +207,9 @@ static ssize_t fxi_w1_write_protect1(struct device *dev, struct device_attribute
 		tempwp[0] = 0x55;
 
 	if(fxi_w1_write_8(&tempwp[0], 0x80))
-			return sprintf(buf, "wrote write protection byte\n");
+		return -EIO;
 
-	return sprintf(buf, "unable to write protection byte\n");
+	return count;
 }
 
 static ssize_t fxi_w1_read_page1(struct device *dev, struct device_attribute *attr, char *buf){
@@ -219,7 +218,7 @@ static ssize_t fxi_w1_read_page1(struct device *dev, struct device_attribute *at
 	return 32;
 }
 
-static ssize_t fxi_w1_write_page1(struct device *dev, struct device_attribute *attr, char *buf, size_t count){
+static ssize_t fxi_w1_write_page1(struct device *dev, struct device_attribute *attr, const char *buf, size_t count){
 	unsigned int i;
 	u8 alignment=0;
 	char temp[32];
