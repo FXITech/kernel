@@ -162,7 +162,7 @@ _mali_osk_errcode_t _ump_ukk_allocate( _ump_uk_allocate_s *user_interaction )
 		new_allocation->is_contiguous = 1;
 	else
 		new_allocation->is_contiguous = 0;
-	DBG_MSG(2, ("Alloc contiguously: %d", new_allocation->is_contiguous));
+	DBG_MSG(2, ("Alloc contiguously: %d\n", new_allocation->is_contiguous));
 
 	/* special case a size of 0, we should try to emulate what malloc does in this case, which is to return a valid pointer that must be freed, but can't be dereferences */
 	if (0 == user_interaction->size)
