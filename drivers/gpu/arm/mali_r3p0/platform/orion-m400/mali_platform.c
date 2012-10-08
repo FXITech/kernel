@@ -17,10 +17,6 @@
 #include "mali_platform.h"
 #include "mali_linux_pm.h"
 
-#if USING_MALI_PMM
-#include "mali_pmm.h"
-#endif
-
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/platform_device.h>
@@ -44,7 +40,7 @@ static struct clk               *mpll_clock = 0;
 static struct clk               *mali_parent_clock = 0;
 static struct clk               *mali_clock = 0;
 
-int mali_gpu_clk 	=		160;
+unsigned int mali_gpu_clk 	=		160;
 static unsigned int GPU_MHZ	=		1000000;
 #ifdef CONFIG_CPU_S5PV310_EVT1
 #ifdef CONFIG_S5PV310_ASV
@@ -201,17 +197,14 @@ static mali_bool init_mali_clock(void)
 	
 	clk_set_parent(mali_parent_clock, mpll_clock);
 	clk_set_parent(mali_clock, mali_parent_clock);
-	clk_set_rate(mali_clock, (unsigned int)mali_gpu_clk * GPU_MHZ);
+	clk_set_rate(mali_clock, mali_gpu_clk * GPU_MHZ);
 
-	MALI_PRINT(("init_mali_clock mali_clock %p \n", mali_clock));
+	MALI_PRINT(("init_mali_clock mali_clock %p set to %uHz\n",
+		    mali_clock, mali_gpu_clk * GPU_MHZ));
 
 
 #ifdef CONFIG_REGULATOR
-#if USING_MALI_PMM
 	g3d_regulator = regulator_get(&mali_gpu_device.dev, "vdd_g3d");
-#else
-	g3d_regulator = regulator_get(NULL, "vdd_g3d");
-#endif
 
 	if (IS_ERR(g3d_regulator)) 
 	{
@@ -464,4 +457,9 @@ u32 pmu_get_power_up_down_info(void)
 }
 
 #endif
+
+_mali_osk_errcode_t mali_platform_power_mode_change(mali_power_mode power_mode)
+{
+	MALI_SUCCESS;
+}
 
