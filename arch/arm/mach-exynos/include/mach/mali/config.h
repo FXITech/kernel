@@ -137,8 +137,7 @@ static _mali_osk_resource_t arch_configuration [] =
 		.size = MEM_MALI_OS_SIZE,
 		.flags = _MALI_CPU_WRITEABLE | _MALI_CPU_READABLE | _MALI_PP_READABLE | _MALI_PP_WRITEABLE | _MALI_GP_READABLE | _MALI_GP_WRITEABLE
 	},
-#endif
-#if USING_DED /* Dedicated Memory */
+#else /* Dedicated Memory */
 	{
 		.type = MEMORY,
 		.description = "Dedicated Memory",
