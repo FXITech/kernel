@@ -75,7 +75,7 @@ MODULE_LICENSE("GPL");
 
 
 /* default preset configured on probe */
-#define HDMI_DEFAULT_PRESET V4L2_DV_1080P60
+#define HDMI_DEFAULT_PRESET V4L2_DV_720P60
 
 struct hdmi_resources {
 	struct clk *hdmi;
