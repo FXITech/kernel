@@ -39,6 +39,9 @@ module_param(debug, int, 0644);
 			printk(KERN_DEBUG "vb2: " fmt, ## arg);		\
 	} while (0)
 
+/* Number of virtual screens that are allocated */
+#define NUM_BUFFERS 2
+
 struct vb2_fb_data {
 	struct video_device *vfd;
 	struct vb2_queue *q;
@@ -233,6 +236,8 @@ static int fxifb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		info->var.xres = var->xres;
 		info->var.yres = var->yres;
 	}
+	var->xres_virtual = var->xres;
+	var->yres_virtual = var->yres * NUM_BUFFERS;
 
 	return 0;
 }
@@ -398,7 +403,7 @@ static int vb2_fb_activate(struct fb_info *info)
 	var = &info->var;
 	var->xres = var->xres_virtual = var->width = width;
 	var->yres = var->height = height;
-	var->yres_virtual = var->yres * 2;
+	var->yres_virtual = var->yres * NUM_BUFFERS;
 	var->bits_per_pixel = conv->bits_per_pixel;
 	var->red = conv->red;
 	var->green = conv->green;
