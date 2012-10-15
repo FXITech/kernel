@@ -378,7 +378,7 @@ int dhd_idletime = DHD_IDLETIME_TICKS;
 module_param(dhd_idletime, int, 0);
 
 /* Use polling */
-uint dhd_poll = FALSE;
+uint dhd_poll = TRUE;
 module_param(dhd_poll, uint, 0);
 
 /* Use interrupts */
@@ -2572,7 +2572,7 @@ static struct net_device_ops dhd_ops_pri = {
 	.ndo_do_ioctl = dhd_ioctl_entry,
 	.ndo_start_xmit = dhd_start_xmit,
 	.ndo_set_mac_address = dhd_set_mac_address,
-	.ndo_set_multicast_list = dhd_set_multicast_list,
+	.ndo_set_rx_mode = dhd_set_multicast_list,
 };
 
 static struct net_device_ops dhd_ops_virt = {
@@ -2580,7 +2580,7 @@ static struct net_device_ops dhd_ops_virt = {
 	.ndo_do_ioctl = dhd_ioctl_entry,
 	.ndo_start_xmit = dhd_start_xmit,
 	.ndo_set_mac_address = dhd_set_mac_address,
-	.ndo_set_multicast_list = dhd_set_multicast_list,
+	.ndo_set_rx_mode = dhd_set_multicast_list,
 };
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 31)) */
 
