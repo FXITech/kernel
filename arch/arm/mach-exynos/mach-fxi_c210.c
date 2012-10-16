@@ -59,6 +59,7 @@
 #include <mach/map.h>
 
 #include "common.h"
+#include "fxi-sysfs.h"
 
 #define MFC_RBASE 0x43000000
 #define MFC_RSIZE (32 << 20)
@@ -922,6 +923,7 @@ subsys_initcall(fxi_c210_pm_late_initcall);
 
 static void __init fxi_c210_machine_init(void)
 {
+	fxi_led_control(LED_GREEN, LED_ON);
 	fxi_c210_power_init();
 
 	s3c_i2c0_set_platdata(NULL);
