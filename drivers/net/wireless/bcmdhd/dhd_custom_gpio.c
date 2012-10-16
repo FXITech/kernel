@@ -40,6 +40,11 @@
 #ifdef CUSTOMER_HW
 extern  void bcm_wlan_power_off(int);
 extern  void bcm_wlan_power_on(int);
+
+#ifdef GET_CUSTOM_MAC_ENABLE
+int export_fxi_wifi_mac(u8 *buf);
+#endif
+
 #endif /* CUSTOMER_HW */
 #if defined(CUSTOMER_HW2)
 #ifdef CONFIG_WIFI_CONTROL_FUNC
@@ -190,6 +195,7 @@ dhd_custom_get_mac_address(unsigned char *buf)
 		bcopy((char *)&ea_example, buf, sizeof(struct ether_addr));
 	}
 #endif /* EXAMPLE_GET_MAC */
+	ret = export_fxi_wifi_mac(buf);
 
 	return ret;
 }

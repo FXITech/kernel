@@ -330,7 +330,9 @@ static __used bool wl_is_ibssstarter(struct wl_priv *wl);
  */
 static s32 __wl_cfg80211_up(struct wl_priv *wl);
 static s32 __wl_cfg80211_down(struct wl_priv *wl);
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 static s32 wl_add_remove_eventmsg(struct net_device *ndev, u16 event, bool add);
+#endif
 static bool wl_is_linkdown(struct wl_priv *wl, const wl_event_msg_t *e);
 static bool wl_is_linkup(struct wl_priv *wl, const wl_event_msg_t *e, struct net_device *ndev);
 static bool wl_is_nonetwork(struct wl_priv *wl, const wl_event_msg_t *e);
@@ -606,6 +608,7 @@ static void swap_key_to_BE(struct wl_wsec_key *key)
 	key->iv_initialized = dtoh32(key->iv_initialized);
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 /* For debug: Dump the contents of the encoded wps ie buffe */
 static void
 wl_validate_wps_ie(char *wps_ie, bool *pbc)
@@ -681,6 +684,7 @@ wl_validate_wps_ie(char *wps_ie, bool *pbc)
 		subel += subelt_len;
 	}
 }
+#endif
 
 static chanspec_t wl_cfg80211_get_shared_freq(struct wiphy *wiphy)
 {
@@ -3473,8 +3477,8 @@ wl_cfg80211_mgmt_tx(struct wiphy *wiphy, struct net_device *ndev,
 	enum nl80211_channel_type channel_type,
 	bool channel_type_valid, unsigned int wait,
 	const u8* buf, size_t len,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
-	bool no_cck,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+	bool no_cck, bool dont_wait_for_ack,
 #endif
 	u64 *cookie)
 {
@@ -3784,6 +3788,7 @@ wl_cfg80211_set_channel(struct wiphy *wiphy, struct net_device *dev,
 	return err;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 static s32
 wl_validate_wpa2ie(struct net_device *dev, bcm_tlv_t *wpa2ie, s32 bssidx)
 {
@@ -3886,7 +3891,9 @@ wl_validate_wpa2ie(struct net_device *dev, bcm_tlv_t *wpa2ie, s32 bssidx)
 exit:
 	return 0;
 }
+#endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 static s32
 wl_validate_wpaie(struct net_device *dev, wpa_ie_fixed_t *wpaie, s32 bssidx)
 {
@@ -4032,7 +4039,9 @@ wl_validate_wpaie(struct net_device *dev, wpa_ie_fixed_t *wpaie, s32 bssidx)
 exit:
 	return 0;
 }
+#endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 static s32
 wl_cfg80211_add_set_beacon(struct wiphy *wiphy, struct net_device *dev,
 	struct beacon_parameters *info)
@@ -4379,6 +4388,7 @@ exit:
 		wldev_iovar_setint(dev, "mpc", 1);
 	return err;
 }
+#endif
 
 #ifdef WL_SCHED_SCAN
 #define PNO_TIME	30
@@ -4512,8 +4522,10 @@ static struct cfg80211_ops wl_cfg80211_ops = {
 	.mgmt_frame_register = wl_cfg80211_mgmt_frame_register,
 	.change_bss = wl_cfg80211_change_bss,
 	.set_channel = wl_cfg80211_set_channel,
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 	.set_beacon = wl_cfg80211_add_set_beacon,
 	.add_beacon = wl_cfg80211_add_set_beacon,
+#endif
 #ifdef WL_SCHED_SCAN
 	.sched_scan_start = wl_cfg80211_sched_scan_start,
 	.sched_scan_stop = wl_cfg80211_sched_scan_stop,
@@ -5010,11 +5022,11 @@ wl_notify_connect_status_ap(struct wl_priv *wl, struct net_device *ndev,
 	isfree = true;
 
 	if (event == WLC_E_ASSOC_IND && reason == DOT11_SC_SUCCESS) {
-		cfg80211_rx_mgmt(ndev, freq, mgmt_frame, len, GFP_ATOMIC);
+		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, GFP_ATOMIC);
 	} else if (event == WLC_E_DISASSOC_IND) {
-		cfg80211_rx_mgmt(ndev, freq, mgmt_frame, len, GFP_ATOMIC);
+		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, GFP_ATOMIC);
 	} else if ((event == WLC_E_DEAUTH_IND) || (event == WLC_E_DEAUTH)) {
-		cfg80211_rx_mgmt(ndev, freq, mgmt_frame, len, GFP_ATOMIC);
+		cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, len, GFP_ATOMIC);
 	}
 
 exit:
@@ -5684,7 +5696,7 @@ wl_notify_rx_mgmt_frame(struct wl_priv *wl, struct net_device *ndev,
 		mgmt_frame = (u8 *)((wl_event_rx_frame_data_t *)rxframe + 1);
 	}
 
-	cfg80211_rx_mgmt(ndev, freq, mgmt_frame, mgmt_frame_len, GFP_ATOMIC);
+	cfg80211_rx_mgmt(ndev, freq, 0, mgmt_frame, mgmt_frame_len, GFP_ATOMIC);
 
 	WL_DBG(("%s: mgmt_frame_len (%d) , e->datalen (%d), channel (%d), freq (%d)\n", __func__,
 		mgmt_frame_len, ntoh32(e->datalen), channel, freq));
@@ -6958,6 +6970,7 @@ static s32 wl_config_ifmode(struct wl_priv *wl, struct net_device *ndev, s32 ift
 	return 0;
 }
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 static s32 wl_add_remove_eventmsg(struct net_device *ndev, u16 event, bool add)
 {
 	s8 iovbuf[WL_EVENTING_MASK_LEN + 12];
@@ -6991,7 +7004,9 @@ eventmsg_out:
 	return err;
 
 }
+#endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 3, 0))
 static int wl_construct_reginfo(struct wl_priv *wl, s32 bw_cap)
 {
 	struct net_device *dev = wl_to_prmry_ndev(wl);
@@ -7113,6 +7128,7 @@ static int wl_construct_reginfo(struct wl_priv *wl, s32 bw_cap)
 	kfree(pbuf);
 	return err;
 }
+#endif
 
 s32 wl_update_wiphybands(struct wl_priv *wl)
 {
