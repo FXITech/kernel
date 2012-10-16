@@ -22,6 +22,7 @@
 #include <mach/regs-gpio.h>
 #include <plat/gpio-cfg.h>
 
+#include "fxi-sysfs.h"
 
 #define	DEBUG_PM_MSG
 #define	SLEEP_DISABLE_FLAG
@@ -216,23 +217,33 @@ static	ssize_t show_hdmi	(struct device *dev, struct device_attribute *attr, cha
 	else		return	sprintf(buf, "%s\n", "off");
 }
 
-void	STATUS_LED_CONTROL	(int led, int val)
+void fxi_led_control(int led, int val)
 {
-	int	index;
+	int index;
 	
-	switch(led)	{
-		case	0:	index = STATUS_LED_RED;		   break;
-		case	1:	index = STATUS_LED_GREEN;	   break;
-		case	2:	index = STATUS_LED_BLUE;	   break;
-		case	3:	index = STATUS_LED_NETRED;   break;
-		case	4:	index = STATUS_LED_NETGREEN; break;
-		default	:								return;
+	switch (led) {
+		case	LED_RED:
+			index = STATUS_LED_RED;	
+			break;
+		case	LED_GREEN:
+			index = STATUS_LED_GREEN;
+			break;
+		case	LED_BLUE:
+			index = STATUS_LED_BLUE;
+			break;
+		case	LED_NETRED:
+			index = STATUS_LED_NETRED;
+			break;
+		case	LED_NETGREEN:
+			index = STATUS_LED_NETGREEN;
+			break;
+		default:
+			return;
 	}
 	
 	gpio_set_value(sControlGpios[index].gpio, ((val != 0) ? 1 : 0));
 }
-
-EXPORT_SYMBOL(STATUS_LED_CONTROL);
+EXPORT_SYMBOL(fxi_led_control);
 
 void SYSTEM_POWER_CONTROL	(int power, int val)
 {
