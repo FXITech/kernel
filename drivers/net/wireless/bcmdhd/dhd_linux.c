@@ -3536,6 +3536,7 @@ dhd_net_attach(dhd_pub_t *dhdp, int ifidx)
 
 	/* Ok, link into the network layer... */
 	if (ifidx == 0) {
+		memcpy(temp_addr, dhdp->mac.octet, ETHER_ADDR_LEN);
 		/*
 		 * device functions for the primary interface only
 		 */
