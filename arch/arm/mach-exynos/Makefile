@@ -41,6 +41,7 @@ obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
 obj-$(CONFIG_MACH_ORIGEN)		+= mach-origen.o
 obj-$(CONFIG_MACH_FXI_C210) 		+= mach-fxi_c210.o fxi-sysfs.o fxi-fxiid.o 
 obj-$(CONFIG_MACH_FXI_C210) 		+= fxi_hdmi_common_lib.o fxi_hdmi_hwif_cec.o fxi_hdmi_cec.o
+CFLAGS_fxi-fxiid.o += -I$(srctree)/drivers/w1
 
 obj-$(CONFIG_MACH_SMDK4212)		+= mach-smdk4x12.o
 obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o
