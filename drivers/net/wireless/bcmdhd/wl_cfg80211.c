@@ -1295,8 +1295,8 @@ wl_run_iscan(struct wl_iscan_ctrl *iscan, struct cfg80211_scan_request *request,
 	s32 params_size =
 	    (WL_SCAN_PARAMS_FIXED_SIZE + offsetof(wl_iscan_params_t, params));
 	struct wl_iscan_params *params;
+	struct wl_priv *wl = wlcfg_drv_priv;
 	s32 err = 0;
-
 	if (request != NULL) {
 		n_channels = request->n_channels;
 		n_ssids = request->n_ssids;
@@ -1327,7 +1327,7 @@ wl_run_iscan(struct wl_iscan_ctrl *iscan, struct cfg80211_scan_request *request,
 		goto done;
 	}
 	err = wldev_iovar_setbuf(iscan->dev, "iscan", params, params_size,
-		iscan->ioctl_buf, WLC_IOCTL_MEDLEN, NULL);
+		iscan->ioctl_buf, WLC_IOCTL_MEDLEN, &wl->ioctl_buf_sync);
 	if (unlikely(err)) {
 		if (err == -EBUSY) {
 			WL_ERR(("system busy : iscan canceled\n"));
@@ -1440,7 +1440,7 @@ wl_run_escan(struct wl_priv *wl, struct net_device *ndev,
 			goto exit;
 		}
 		err = wldev_iovar_setbuf(ndev, "escan", params, params_size,
-			wl->escan_ioctl_buf, WLC_IOCTL_MEDLEN, NULL);
+			wl->escan_ioctl_buf, WLC_IOCTL_MEDLEN, &wl->ioctl_buf_sync);
 		if (unlikely(err))
 			WL_ERR((" Escan set error (%d)\n", err));
 		kfree(params);
@@ -3180,7 +3180,7 @@ wl_update_pmklist(struct net_device *dev, struct wl_pmk_list *pmk_list,
 	}
 	if (likely(!err)) {
 		err = wldev_iovar_setbuf(dev, "pmkid_info", (char *)pmk_list,
-			sizeof(*pmk_list), wl->ioctl_buf, WLC_IOCTL_MAXLEN, NULL);
+			sizeof(*pmk_list), wl->ioctl_buf, WLC_IOCTL_MAXLEN, &wl->ioctl_buf_sync);
 	}
 
 	return err;
@@ -5184,7 +5184,7 @@ static s32 wl_get_assoc_ies(struct wl_priv *wl, struct net_device *ndev)
 
 	WL_DBG(("Enter \n"));
 	err = wldev_iovar_getbuf(ndev, "assoc_info", NULL, 0, wl->extra_buf,
-		WL_ASSOC_INFO_MAX, NULL);
+		WL_ASSOC_INFO_MAX, &wl->ioctl_buf_sync);
 	if (unlikely(err)) {
 		WL_ERR(("could not get assoc info (%d)\n", err));
 		return err;
@@ -5203,7 +5203,7 @@ static s32 wl_get_assoc_ies(struct wl_priv *wl, struct net_device *ndev)
 	}
 	if (assoc_info.req_len) {
 		err = wldev_iovar_getbuf(ndev, "assoc_req_ies", NULL, 0, wl->extra_buf,
-			WL_ASSOC_INFO_MAX, NULL);
+			WL_ASSOC_INFO_MAX, &wl->ioctl_buf_sync);
 		if (unlikely(err)) {
 			WL_ERR(("could not get assoc req (%d)\n", err));
 			return err;
@@ -5224,7 +5224,7 @@ static s32 wl_get_assoc_ies(struct wl_priv *wl, struct net_device *ndev)
 	}
 	if (assoc_info.resp_len) {
 		err = wldev_iovar_getbuf(ndev, "assoc_resp_ies", NULL, 0, wl->extra_buf,
-			WL_ASSOC_INFO_MAX, NULL);
+			WL_ASSOC_INFO_MAX, &wl->ioctl_buf_sync);
 		if (unlikely(err)) {
 			WL_ERR(("could not get assoc resp (%d)\n", err));
 			return err;
@@ -6329,7 +6329,7 @@ static s32 wl_escan_handler(struct wl_priv *wl,
 	u32 i;
 
 	WL_DBG((" enter event type : %d, status : %d \n",
-		ntoh32(e->event_type), ntoh32(e->status)));
+		ntoh32(e->event_type), status));
 	/* P2P SCAN is coming from primary interface */
 	if (wl_get_p2p_status(wl, SCANNING)) {
 		if (wl_get_drv_status_all(wl, SENDING_ACT_FRM))
@@ -6635,7 +6635,7 @@ s32 wl_cfg80211_attach_post(struct net_device *ndev)
 				}
 #endif /* defined(WLP2P) && (WL_ENABLE_P2P_IF) */
 
-				wl->p2p_supported = true;
+				wl->p2p_supported = false;
 			}
 	} else
 		return -ENODEV;
