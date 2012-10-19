@@ -19,6 +19,7 @@
 #include "../w1.h"
 #include "../w1_int.h"
 #include "../w1_family.h"
+#include "w1_ds2431.h"
 
 #define W1_F2D_EEPROM_SIZE		128
 #define W1_F2D_PAGE_COUNT		4
@@ -96,11 +97,8 @@ static int w1_f2d_readblock(struct w1_slave *sl, int off, int count, char *buf)
 	return -1;
 }
 
-static ssize_t w1_f2d_read_bin(struct file *filp, struct kobject *kobj,
-			       struct bin_attribute *bin_attr,
-			       char *buf, loff_t off, size_t count)
+int w1_f2d_read(struct w1_slave *sl, int off, int count, char *buf)
 {
-	struct w1_slave *sl = kobj_to_w1_slave(kobj);
 	int todo = count;
 
 	count = w1_f2d_fix_count(off, count, W1_F2D_EEPROM_SIZE);
@@ -129,6 +127,14 @@ static ssize_t w1_f2d_read_bin(struct file *filp, struct kobject *kobj,
 	mutex_unlock(&sl->master->mutex);
 
 	return count;
+}
+
+static ssize_t w1_f2d_read_bin(struct file *filp, struct kobject *kobj,
+			       struct bin_attribute *bin_attr,
+			       char *buf, loff_t off, size_t count)
+{
+	struct w1_slave *sl = kobj_to_w1_slave(kobj);
+	return w1_f2d_read(sl, off, count, buf);
 }
 
 /*
@@ -303,6 +309,8 @@ static void __exit w1_f2d_fini(void)
 {
 	w1_unregister_family(&w1_family_2d);
 }
+
+EXPORT_SYMBOL(w1_f2d_read);
 
 module_init(w1_f2d_init);
 module_exit(w1_f2d_fini);
