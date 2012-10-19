@@ -27,6 +27,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
 #include <linux/pm_domain.h>
+#include <linux/w1-gpio.h>
 
 #include <linux/dma-mapping.h>
 #include <linux/memblock.h>
@@ -67,6 +68,7 @@
 #define MFC_LBASE 0x51000000
 #define MFC_LSIZE (32 << 20)
 
+#define FXI_W1_GPIO_PIN EXYNOS4_GPK3(1)
 
 /* Following are default values for UCON, ULCON and UFCON UART registers */
 #define FXI_C210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
@@ -781,6 +783,26 @@ static struct platform_device fxi_sysfs = {
   .id = -1,
 };
 
+static void w1_gpio_pullup_enable(int enable)
+{
+	samsung_gpio_pull_t pull = S3C_GPIO_PULL_NONE;
+	if (enable)
+		pull = S3C_GPIO_PULL_UP;
+	s3c_gpio_setpull(FXI_W1_GPIO_PIN, pull);
+}
+
+static struct w1_gpio_platform_data fxi_w1_gpio_pdata = {
+	.pin = FXI_W1_GPIO_PIN,
+	.is_open_drain = 0,
+	.enable_external_pullup = w1_gpio_pullup_enable,
+};
+
+static struct platform_device fxi_w1_gpio = {
+	.name = "w1-gpio",
+	.id = -1,
+	.dev.platform_data = &fxi_w1_gpio_pdata,
+};
+
 /* fxi-fxiid entry */
 static struct platform_device fxi_fxiid = {
   .name = "fxi-fxiid",
@@ -844,6 +866,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&exynos4_device_i2s0,
   	&btbutton_device_gpiokeys,
   	&fxi_sysfs,
+	&fxi_w1_gpio,
   	&fxi_fxiid,
 	&fxi_mali,
 };
