@@ -186,6 +186,8 @@ static __init int exynos4_pm_init_power_domain(void)
 	exynos_pm_add_dev_to_genpd(&s5p_device_g2d, &exynos4_pd_lcd0);
 #endif
 #ifdef CONFIG_S5P_DEV_G3D
+	/* MALI requires the PD to be always on. */
+	exynos4_pd_g3d.pd.power_off = NULL;
 	exynos_pm_add_dev_to_genpd(&s5p_device_g3d, &exynos4_pd_g3d);
 #endif
 #ifdef CONFIG_S5P_DEV_JPEG
