@@ -925,25 +925,6 @@ static void __init fxi_c210_reserve(void)
   s5p_mfc_reserve_mem(MFC_RBASE, MFC_RSIZE, MFC_LBASE, MFC_LSIZE);
 }
 
-/**
- * Make sure the Mali does not get powered down.
- * TODO(havardk): Find out if there is a better way to do this.
- */
-static __init int fxi_c210_pm_late_initcall(void)
-{
-	struct generic_pm_domain *p;
-
-	p = pd_to_genpd(s5p_device_g3d.dev.pm_domain);
-
-	/* This is flag not to call power_off callback */
-	/* pm_genpd_dev_always_on doesn't work with Mali */
-
-	p->status = GPD_STATE_WAIT_MASTER;
-
-	return 0;
-}
-subsys_initcall(fxi_c210_pm_late_initcall);
-
 static void __init fxi_c210_machine_init(void)
 {
 	fxi_led_control(LED_GREEN, LED_ON);
