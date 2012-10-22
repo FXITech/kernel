@@ -143,33 +143,6 @@ static void __setup_offsets(struct vb2_queue *q, unsigned int n)
 }
 
 /**
- * __setup_cookie() - setup unique cookies for every plane in
- * every buffer on the queue
- */
-static void __setup_cookie(struct vb2_queue *q)
-{
-	unsigned int buffer, plane;
-	struct vb2_buffer *vb;
-	struct v4l2_plane *p;
-
-	for (buffer = 0; buffer < q->num_buffers; ++buffer) {
-		vb = q->bufs[buffer];
-		if (!vb)
-			continue;
-
-		for (plane = 0; plane < vb->num_planes; ++plane) {
-			p = &vb->v4l2_planes[plane];
-			p->cookie = call_memop(q, cookie,
-					vb->planes[plane].mem_priv);
-			dprintk(3, "buffer %d, plane %d cookie 0x%08x\n",
-					buffer, plane, (int)p->cookie);
-		}
-	}
-}
-
-
-
-/**
  * __vb2_queue_alloc() - allocate videobuf buffer structures and (for MMAP type)
  * video buffer memory for all buffers/planes on the queue and initializes the
  * queue
@@ -230,10 +203,6 @@ static int __vb2_queue_alloc(struct vb2_queue *q, enum v4l2_memory memory,
 	}
 
 	__setup_offsets(q, buffer);
-
-	if (memory == V4L2_MEMORY_MMAP) {
-		__setup_cookie(q);
-	}
 
 	dprintk(1, "Allocated %d buffers, %d plane(s) each\n",
 			buffer, num_planes);
