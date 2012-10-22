@@ -848,7 +848,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s5p_device_fimc2,
 	&s5p_device_fimc3,
 	&s5p_device_fimc_md,
-	&s5p_device_fimd0,
 	&s5p_device_g2d,
 	&s5p_device_g3d,
 	&s5p_device_hdmi,
@@ -870,18 +869,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
   	&fxi_fxiid,
 	&fxi_mali,
 };
-
-/* LCD Backlight data */
-static struct samsung_bl_gpio_info fxi_c210_bl_gpio_info = {
-	.no		= EXYNOS4_GPD0(0),
-	.func		= S3C_GPIO_SFN(2),
-};
-
-static struct platform_pwm_backlight_data fxi_c210_bl_data = {
-	.pwm_id		= 0,
-	.pwm_period_ns	= 1000,
-};
-
 
 static void __init fxi_c210_bt_setup(void)
 {
@@ -954,8 +941,6 @@ static void __init fxi_c210_machine_init(void)
 	s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
 
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
-
-	samsung_bl_set(&fxi_c210_bl_gpio_info, &fxi_c210_bl_data);
 }
 
 MACHINE_START(FXI_C210, "FXI_C210")
