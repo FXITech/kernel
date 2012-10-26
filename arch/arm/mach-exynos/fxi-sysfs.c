@@ -129,26 +129,26 @@ static	ssize_t show_gpio(struct device *dev, struct device_attribute *attr, char
 static	ssize_t set_gpio(struct device *dev, struct device_attribute *attr, const char *buf, size_t count);
 static	ssize_t show_hdmi(struct device *dev, struct device_attribute *attr, char *buf);
 
-static	DEVICE_ATTR(bt_button, S_IRWXUGO, show_gpio, set_gpio);
+static	DEVICE_ATTR(bt_button, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
-static	DEVICE_ATTR(modem_power, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(modem_reset, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(modem_disable1, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(modem_disable2, S_IRWXUGO, show_gpio, set_gpio);
+static	DEVICE_ATTR(modem_power, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(modem_reset, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(modem_disable1, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(modem_disable2, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
-static	DEVICE_ATTR(led_red, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(led_green, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(led_blue, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(led_netred, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(led_netgreen, S_IRWXUGO, show_gpio, set_gpio);
+static	DEVICE_ATTR(led_red, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(led_green, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(led_blue, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(led_netred, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(led_netgreen, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
-static	DEVICE_ATTR(power_5v0, S_IRWXUGO, show_gpio, set_gpio);
-static	DEVICE_ATTR(power_12v0, S_IRWXUGO, show_gpio, set_gpio);
+static	DEVICE_ATTR(power_5v0, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
+static	DEVICE_ATTR(power_12v0, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
-static	DEVICE_ATTR(hdmi_state, S_IRWXUGO, show_hdmi, NULL);
+static	DEVICE_ATTR(hdmi_state, S_IRUGO | S_IWUSR, show_hdmi, NULL);
 
 static struct attribute *fxi_sysfs_entries[] = {
-	&dev_attr_bt_button,
+	&dev_attr_bt_button.attr,
 
 	&dev_attr_modem_power.attr,
 	&dev_attr_modem_reset.attr,
