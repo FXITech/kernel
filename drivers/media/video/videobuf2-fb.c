@@ -30,6 +30,11 @@
 
 #include "s5p-tv/mixer.h"
 
+#include "ump_kernel_interface_ref_drv.h"
+
+#define GET_UMP_SECURE_ID_BUF1   _IOWR('m', 310, unsigned int)
+#define GET_UMP_SECURE_ID_BUF2   _IOWR('m', 311, unsigned int)
+
 static int debug = 1;
 module_param(debug, int, 0644);
 
@@ -60,6 +65,7 @@ struct vb2_fb_data {
 	struct file fake_file;
 	struct dentry fake_dentry;
 	struct inode fake_inode;
+	ump_dd_handle ump_handle[2];
 };
 
 static int vb2_fb_activate(struct fb_info *info);
@@ -107,6 +113,15 @@ static struct fmt_desc fmt_conv_table[] = {
 	/* TODO: add more format descriptors */
 };
 
+static void create_ump_ids(struct vb2_fb_data *data, unsigned int smem, int size)
+{
+	ump_dd_physical_block block;
+	block.addr = smem;
+	block.size = size;
+	data->ump_handle[0] = ump_dd_handle_create_from_phys_blocks(&block, 1);
+	data->ump_handle[1] = ump_dd_handle_create_from_phys_blocks(&block, 1);
+}
+
 static int fxifb_wait_for_vsync(struct fb_info *info, u32 crtc)
 {
 	struct vb2_fb_data *data = info->par;
@@ -125,19 +140,32 @@ static int fxifb_wait_for_vsync(struct fb_info *info, u32 crtc)
 static int fxifb_ioctl(struct fb_info *info, unsigned int cmd,
 		       unsigned long arg)
 {
+	struct vb2_fb_data *data = info->par;
 	u32 crtc;
 	int ret = 0;
 
 	switch (cmd) {
 
 	case FBIO_WAITFORVSYNC:
-		if (get_user(crtc, (u32 __user *)arg)) {
+		if (get_user(crtc, (__u32 __user *)arg))
 			ret = -EFAULT;
-			break;
-		}
-
-		ret = fxifb_wait_for_vsync(info, crtc);
+		else
+			ret = fxifb_wait_for_vsync(info, crtc);
 		break;
+
+	case GET_UMP_SECURE_ID_BUF1: {
+		u32 __user *secureid = (u32 __user *) arg;
+
+		ret = put_user(ump_dd_secure_id_get(data->ump_handle[0]), secureid);
+		break;
+	}
+
+	case GET_UMP_SECURE_ID_BUF2: {
+		u32 __user *secureid = (u32 __user *) arg;
+
+		ret = put_user(ump_dd_secure_id_get(data->ump_handle[1]), secureid);
+		break;
+	}
 
 	default:
 		/* Unsupported / Invalid ioctl op */
@@ -297,7 +325,6 @@ static int vb2_fb_activate(struct fb_info *info)
 
 	if (data->dv_preset && data->vfd->ioctl_ops->vidioc_s_dv_preset) {
 		struct v4l2_dv_preset preset = {0};
-		struct v4l2_format fmt = {0};
 		printk("Setting video node to preset: %d\n", data->dv_preset);
 		preset.preset = data->dv_preset;
 		ret = data->vfd->ioctl_ops->vidioc_s_dv_preset(
@@ -399,6 +426,8 @@ static int vb2_fb_activate(struct fb_info *info)
 	info->fix.line_length = bpl;
 	info->fix.smem_start = vb2_dma_contig_plane_dma_addr(q->bufs[0], 0);
 	info->fix.smem_len = info->fix.mmio_len = size;
+
+	create_ump_ids(data, info->fix.smem_start, info->fix.smem_len);
 
 	var = &info->var;
 	var->xres = var->xres_virtual = var->width = width;
