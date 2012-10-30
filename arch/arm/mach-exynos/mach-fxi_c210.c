@@ -943,7 +943,7 @@ static void __init fxi_c210_machine_init(void)
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
 }
 
-MACHINE_START(FXI_C210, "FXI_C210")
+MACHINE_START(FXI_C210, "cottoncandy")
 	/* Maintainer: JeongHyeon Kim <jhkim@insignal.co.kr> */
 	.atag_offset	= 0x100,
 	.init_irq	= exynos4_init_irq,
