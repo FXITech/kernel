@@ -298,6 +298,11 @@ static int fxi_sysfs_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static void fxi_sysfs_shutdown(struct platform_device *pdev)
+{
+	fxi_led_control(LED_GREEN, 0);
+}
+
 static struct platform_driver fxi_sysfs_driver = {
 	.driver = {
 		.name = "fxi-sysfs",
@@ -305,6 +310,7 @@ static struct platform_driver fxi_sysfs_driver = {
 	},
 	.probe = fxi_sysfs_probe,
 	.remove = fxi_sysfs_remove,
+	.shutdown = fxi_sysfs_shutdown,
 	.suspend = fxi_sysfs_suspend,
 	.resume = fxi_sysfs_resume,
 };
