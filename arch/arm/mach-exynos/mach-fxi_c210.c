@@ -814,6 +814,10 @@ static struct platform_device fxi_mali = {
   .id = -1,
 };
 
+static struct platform_device ccandy_audio = {
+	.name = "ccandy-audio",
+	.id = -1,
+};
 
 static struct resource fxichardev_resource[] = {
 };
@@ -830,7 +834,6 @@ struct platform_device fxi_c210_device_chardev = {
     .coherent_dma_mask  = DMA_BIT_MASK(32),
   },
 };
-
 
 static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_hsmmc2,
@@ -868,6 +871,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&fxi_w1_gpio,
   	&fxi_fxiid,
 	&fxi_mali,
+	&ccandy_audio,
 };
 
 static void __init fxi_c210_bt_setup(void)
