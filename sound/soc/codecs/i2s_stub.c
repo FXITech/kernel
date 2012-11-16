@@ -29,9 +29,15 @@ static struct snd_soc_dai_driver i2s_stub_dai = {
 	.name		= "i2s-stub-hifi",
 	.playback	= {
 		.stream_name	= "Playback",
+#ifndef CONFIG_SND_CCANDY
 		.channels_min	= 1,
 		.channels_max	= 2,
 		.rates		= STUB_RATES,
+#else
+		.channels_min	= 2,
+		.channels_max	= 2,
+		.rates		= SNDRV_PCM_RATE_44100,
+#endif
 		.formats	= STUB_FORMATS,
 	},
 };

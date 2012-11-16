@@ -48,14 +48,15 @@ config SND_SOC_SAMSUNG_NEO1973_WM8753
 	  Say Y here to enable audio support for the Openmoko Neo1973
 	  Smartphones.
 
-config SND_SOC_SAMSUNG_I2S_FXI
-	tristate "I2S Audio for FXI"
-	depends on MACH_FXI_C210
-	select SND_FXI
+config SND_CCANDY
+	tristate "Cotton Candy I2S playback and digital loopback capture support"
+	depends on SND_SOC_SAMSUNG && MACH_FXI_C210
+	select SND_CCANDY_STUB
 	select SND_SAMSUNG_I2S
-	select SND_SAMSUNG_SPDIF
+	select SND_SOC_I2S_STUB
+
 	help
-	Say Y if you want to add support for I2S SoC Audio on Cotton Candy.
+	  Say Y if you want to add support for I2S playback and loopback capture
 
 config SND_SOC_SAMSUNG_JIVE_WM8750
 	tristate "SoC I2S Audio support for Jive"
