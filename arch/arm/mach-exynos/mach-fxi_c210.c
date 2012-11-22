@@ -423,9 +423,9 @@ struct max8997_platform_data __initdata fxi_c210_max8997_pdata = {
   .ignore_gpiodvs_side_effect = true,
   .buck125_default_idx = 0x0,
 
-  .buck125_gpios[0] = EXYNOS4_GPX0(0),
-  .buck125_gpios[1] = EXYNOS4_GPX0(1),
-  .buck125_gpios[2] = EXYNOS4_GPX0(2),
+  .buck125_gpios[0] = EXYNOS4_GPX1(6),
+  .buck125_gpios[1] = EXYNOS4_GPX1(7),
+  .buck125_gpios[2] = EXYNOS4_GPX0(4),
 
   .buck1_voltage[0]   = 1250000,
   .buck1_voltage[1]   = 1200000,
@@ -460,7 +460,7 @@ static struct i2c_board_info i2c0_devs[] __initdata = {
 	{
 		I2C_BOARD_INFO("max8997", (0xCC >> 1)),
 		.platform_data	= &fxi_c210_max8997_pdata,
-		.irq		= IRQ_EINT(4),
+		.irq		= IRQ_EINT(0),
 	},
 #ifdef CONFIG_TOUCHSCREEN_UNIDISPLAY_TS
 	{
@@ -776,9 +776,9 @@ static void __init fxi_c210_map_io(void)
 
 static void __init fxi_c210_power_init(void)
 {
-	gpio_request(EXYNOS4_GPX0(4), "PMIC_IRQ");
-	s3c_gpio_cfgpin(EXYNOS4_GPX0(4), S3C_GPIO_SFN(0xf));
-	s3c_gpio_setpull(EXYNOS4_GPX0(4), S3C_GPIO_PULL_NONE);
+	gpio_request(EXYNOS4_GPX0(0), "PMIC_IRQ");
+	s3c_gpio_cfgpin(EXYNOS4_GPX0(0), S3C_GPIO_SFN(0xf));
+	s3c_gpio_setpull(EXYNOS4_GPX0(0), S3C_GPIO_PULL_NONE);
 }
 
 static void __init fxi_c210_reserve(void)
