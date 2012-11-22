@@ -15,17 +15,12 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 #include <linux/input.h>
-#include <linux/pwm_backlight.h>
 #include <linux/gpio_keys.h>
 #include <linux/i2c.h>
 #include <linux/regulator/machine.h>
 #include <linux/mfd/max8997.h>
-#include <linux/lcd.h>
 #include <linux/rfkill-gpio.h>
-#include <linux/ath6kl.h>
-#include <linux/delay.h>
 #include <linux/gpio_keys.h>
-#include <linux/input.h>
 #include <linux/pm_domain.h>
 #include <linux/w1-gpio.h>
 
@@ -37,8 +32,6 @@
 #include <asm/hardware/gic.h>
 #include <asm/mach-types.h>
 
-#include <video/platform_lcd.h>
-
 #include <plat/regs-serial.h>
 #include <plat/regs-fb-v4.h>
 #include <plat/cpu.h>
@@ -48,11 +41,7 @@
 #include <plat/ehci.h>
 #include <plat/clock.h>
 #include <plat/gpio-cfg.h>
-#include <plat/backlight.h>
-#include <plat/pd.h>
-#include <plat/fb.h>
 #include <plat/mfc.h>
-#include <plat/udc-hs.h>
 #include <plat/hdmi.h>
 #include <plat/otg.h>
 
@@ -626,114 +615,6 @@ static struct platform_device fxi_c210_leds_gpio = {
 	},
 };
 
-static struct gpio_keys_button fxi_c210_gpio_keys_table[] = {
-	{
-		.code			= KEY_MENU,
-		.gpio			= EXYNOS4_GPX1(5),
-		.desc			= "gpio-keys: KEY_MENU",
-		.type			= EV_KEY,
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 1,
-	}, {
-		.code			= KEY_HOME,
-		.gpio			= EXYNOS4_GPX1(6),
-		.desc			= "gpio-keys: KEY_HOME",
-		.type			= EV_KEY,
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 1,
-	}, {
-		.code			= KEY_BACK,
-		.gpio			= EXYNOS4_GPX1(7),
-		.desc			= "gpio-keys: KEY_BACK",
-		.type			= EV_KEY,
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 1,
-	}, {
-		.code			= KEY_UP,
-		.gpio			= EXYNOS4_GPX2(0),
-		.desc			= "gpio-keys: KEY_UP",
-		.type			= EV_KEY,
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 1,
-	}, {
-		.code			= KEY_DOWN,
-		.gpio			= EXYNOS4_GPX2(1),
-		.desc			= "gpio-keys: KEY_DOWN",
-		.type			= EV_KEY,
-		.active_low		= 1,
-		.wakeup			= 1,
-		.debounce_interval	= 1,
-	},
-};
-
-static struct gpio_keys_platform_data fxi_c210_gpio_keys_data = {
-	.buttons	= fxi_c210_gpio_keys_table,
-	.nbuttons	= ARRAY_SIZE(fxi_c210_gpio_keys_table),
-};
-
-static struct platform_device fxi_c210_device_gpiokeys = {
-	.name		= "gpio-keys",
-	.dev		= {
-		.platform_data	= &fxi_c210_gpio_keys_data,
-	},
-};
-#if 0
-static void lcd_hv070wsa_set_power(struct plat_lcd_data *pd, unsigned int power)
-{
-	int ret;
-
-	if (power)
-		ret = gpio_request_one(EXYNOS4_GPE3(4),
-					GPIOF_OUT_INIT_HIGH, "GPE3_4");
-	else
-		ret = gpio_request_one(EXYNOS4_GPE3(4),
-					GPIOF_OUT_INIT_LOW, "GPE3_4");
-
-	gpio_free(EXYNOS4_GPE3(4));
-
-	if (ret)
-		pr_err("failed to request gpio for LCD power: %d\n", ret);
-}
-
-static struct plat_lcd_data fxi_c210_lcd_hv070wsa_data = {
-	.set_power = lcd_hv070wsa_set_power,
-	.min_uV		= 3300000,
-	.max_uV		= 3300000,
-};
-
-static struct platform_device fxi_c210_lcd_hv070wsa = {
-	.name			= "platform-lcd",
-	.dev.parent		= &s5p_device_fimd0.dev,
-	.dev.platform_data	= &fxi_c210_lcd_hv070wsa_data,
-};
-
-static struct s3c_fb_pd_win fxi_c210_fb_win0 = {
-	.win_mode = {
-		.left_margin	= 64,
-		.right_margin	= 16,
-		.upper_margin	= 64,
-		.lower_margin	= 16,
-		.hsync_len	= 48,
-		.vsync_len	= 3,
-		.xres		= 1024,
-		.yres		= 600,
-	},
-	.max_bpp		= 32,
-	.default_bpp		= 24,
-};
-
-static struct s3c_fb_platdata fxi_c210_lcd_pdata __initdata = {
-	.win[0]		= &fxi_c210_fb_win0,
-	.vidcon0	= VIDCON0_VIDOUT_RGB | VIDCON0_PNRMODE_RGB,
-	.vidcon1	= VIDCON1_INV_HSYNC | VIDCON1_INV_VSYNC |
-				VIDCON1_INV_VCLK,
-	.setup_gpio	= exynos4_fimd0_gpio_setup_24bpp,
-};
-#endif
 /* Bluetooth rfkill gpio platform data */
 struct rfkill_gpio_platform_data fxi_c210_bt_pdata = {
 	.reset_gpio	= EXYNOS4_GPK1(3),
@@ -861,7 +742,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s5p_device_mixer,
 	&samsung_asoc_dma,
 	&exynos4_device_ohci,
-	&fxi_c210_device_gpiokeys,
 	&fxi_c210_leds_gpio,
 	&fxi_c210_device_bluetooth,
 	&exynos4_device_tmu,
@@ -873,16 +753,6 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&fxi_mali,
 	&ccandy_audio,
 };
-
-static void __init fxi_c210_bt_setup(void)
-{
-	gpio_request(EXYNOS4_GPA0(0), "GPIO BT_UART");
-	/* 4 UART Pins configuration */
-	s3c_gpio_cfgrange_nopull(EXYNOS4_GPA0(0), 4, S3C_GPIO_SFN(2));
-	/* Setup BT Reset, this gpio will be requesed by rfkill-gpio */
-	s3c_gpio_cfgpin(EXYNOS4_GPX2(2), S3C_GPIO_OUTPUT);
-	s3c_gpio_setpull(EXYNOS4_GPX2(2), S3C_GPIO_PULL_NONE);
-}
 
 /* I2C module and id for HDMIPHY */
 static struct i2c_board_info hdmiphy_info = {
