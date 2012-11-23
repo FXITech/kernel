@@ -15,19 +15,21 @@
 #include <linux/poll.h>
 #include <linux/miscdevice.h>
 #include <linux/clk.h>
-#include <linux/module.h>
 #include <linux/sched.h>
-
+#include <linux/platform_device.h>
+#include <linux/interrupt.h>
+#include <linux/module.h>
 #include <plat/tvout.h>
 
-#include "fxi_hdmi_hwif.h"
-#include "fxi_hdmi_common_lib.h"
+#include "cec.h"
+
+#define DRV_NAME "HDMI_CEC"
 
 #define CEC_IOC_MAGIC        'c'
 #define CEC_IOC_SETLADDR     _IOW(CEC_IOC_MAGIC, 0, unsigned int)
 
 #define VERSION   "1.0" /* Driver version number */
-#define CEC_MINOR 242   /* Major 10, Minor 242, /dev/cec */
+#define CEC_MINOR 242	/* Major 10, Minor 242, /dev/cec */
 
 
 #define CEC_STATUS_TX_RUNNING       (1<<0)
@@ -111,22 +113,22 @@ static ssize_t s5p_cec_read(struct file *file, char __user *buffer,
 			size_t count, loff_t *ppos)
 {
 	ssize_t retval;
+	unsigned long spin_flags;
 
 	if (wait_event_interruptible(cec_rx_struct.waitq,
 			atomic_read(&cec_rx_struct.state) == STATE_DONE)) {
 		return -ERESTARTSYS;
 	}
-
-	spin_lock_irq(&cec_rx_struct.lock);
+	spin_lock_irqsave(&cec_rx_struct.lock, spin_flags);
 
 	if (cec_rx_struct.size > count) {
-		spin_unlock_irq(&cec_rx_struct.lock);
+		spin_unlock_irqrestore(&cec_rx_struct.lock, spin_flags);
 
 		return -1;
 	}
 
 	if (copy_to_user(buffer, cec_rx_struct.buffer, cec_rx_struct.size)) {
-		spin_unlock_irq(&cec_rx_struct.lock);
+		spin_unlock_irqrestore(&cec_rx_struct.lock, spin_flags);
 		printk(KERN_ERR " copy_to_user() failed!\n");
 
 		return -EFAULT;
@@ -135,7 +137,7 @@ static ssize_t s5p_cec_read(struct file *file, char __user *buffer,
 	retval = cec_rx_struct.size;
 
 	s5p_cec_set_rx_state(STATE_RX);
-	spin_unlock_irq(&cec_rx_struct.lock);
+	spin_unlock_irqrestore(&cec_rx_struct.lock, spin_flags);
 
 	return retval;
 }
@@ -183,13 +185,8 @@ static ssize_t s5p_cec_write(struct file *file, const char __user *buffer,
 	return count;
 }
 
-#if 0
-static int s5p_cec_ioctl(struct inode *inode, struct file *file, u32 cmd,
-			unsigned long arg)
-#else
 static long s5p_cec_ioctl(struct file *file, unsigned int cmd,
 						unsigned long arg)
-#endif
 {
 	u32 laddr;
 
@@ -226,11 +223,7 @@ static const struct file_operations cec_fops = {
 	.release = s5p_cec_release,
 	.read    = s5p_cec_read,
 	.write   = s5p_cec_write,
-#if 1
 	.unlocked_ioctl = s5p_cec_ioctl,
-#else
-	.ioctl   = s5p_cec_ioctl,
-#endif
 	.poll    = s5p_cec_poll,
 };
 
@@ -242,7 +235,6 @@ static struct miscdevice cec_misc_device = {
 
 static irqreturn_t s5p_cec_irq_handler(int irq, void *dev_id)
 {
-
 	u32 status = 0;
 
 	status = s5p_cec_get_status();
@@ -296,27 +288,18 @@ static irqreturn_t s5p_cec_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static int __init s5p_cec_probe(struct platform_device *pdev)
+static int __devinit s5p_cec_probe(struct platform_device *pdev)
 {
 	struct s5p_platform_cec *pdata;
 	u8 *buffer;
-	int irq_num;
 	int ret;
+	struct resource *res;
 
-	/*
-	 * CEC GPIO number is changed.
-	 */
-	#if 0
-	s3c_gpio_cfgpin(S5PV210_GPH1(4), S3C_GPIO_SFN(0x4));
-	s3c_gpio_setpull(S5PV210_GPH1(4), S3C_GPIO_PULL_NONE);
-	#endif
 	pdata = to_tvout_plat(&pdev->dev);
 
 	if (pdata->cfg_gpio)
 		pdata->cfg_gpio(pdev);
 
-
-	/* get ioremap addr */
 	s5p_cec_mem_probe(pdev);
 
 	if (misc_register(&cec_misc_device)) {
@@ -326,16 +309,14 @@ static int __init s5p_cec_probe(struct platform_device *pdev)
 		return -EBUSY;
 	}
 
-	irq_num = platform_get_irq(pdev, 0);
-
-	if (irq_num < 0) {
-		printk(KERN_ERR  "failed to get %s irq resource\n", "cec");
+	res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+	if (res == NULL) {
+		dev_err(&pdev->dev, "failed to get irq resource.\n");
 		ret = -ENOENT;
-
 		return ret;
 	}
 
-	ret = request_irq(irq_num, s5p_cec_irq_handler, IRQF_DISABLED,
+	ret = request_irq(res->start, s5p_cec_irq_handler, IRQF_DISABLED,
 		pdev->name, &pdev->id);
 
 	if (ret != 0) {
@@ -360,13 +341,14 @@ static int __init s5p_cec_probe(struct platform_device *pdev)
 	cec_rx_struct.buffer = buffer;
 
 	cec_rx_struct.size   = 0;
-	TV_CLK_GET_WITH_ERR_CHECK(hdmi_cec_clk, pdev, "hdmicec");
+	TV_CLK_GET_WITH_ERR_CHECK(hdmi_cec_clk, pdev, "sclk_cec");
 
+	dev_info(&pdev->dev, "probe successful\n");
 
 	return 0;
 }
 
-static int s5p_cec_remove(struct platform_device *pdev)
+static int __devexit s5p_cec_remove(struct platform_device *pdev)
 {
 	return 0;
 }
@@ -388,17 +370,17 @@ static int s5p_cec_resume(struct platform_device *dev)
 
 static struct platform_driver s5p_cec_driver = {
 	.probe		= s5p_cec_probe,
-	.remove		= s5p_cec_remove,
+	.remove		= __devexit_p(s5p_cec_remove),
 	.suspend	= s5p_cec_suspend,
 	.resume		= s5p_cec_resume,
 	.driver		= {
-		.name	= "s5p-tvout-cec",
+		.name	= "s5p-hdmi-cec",
 		.owner	= THIS_MODULE,
 	},
 };
 
 static char banner[] __initdata =
-	"S5P CEC Driver, (c) 2009 Samsung Electronics\n";
+	"S5P CEC for Exynos4 Driver, (c) 2009 Samsung Electronics\n";
 
 static int __init s5p_cec_init(void)
 {

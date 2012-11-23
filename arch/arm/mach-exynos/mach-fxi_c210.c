@@ -745,6 +745,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s5p_device_g3d,
 	&s5p_device_hdmi,
 	&s5p_device_i2c_hdmiphy,
+	&s5p_device_cec,
 	&s5p_device_mfc,
 	&s5p_device_mfc_l,
 	&s5p_device_mfc_r,
@@ -767,6 +768,16 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 static struct i2c_board_info hdmiphy_info = {
         I2C_BOARD_INFO("hdmiphy", 0x38),
 };
+
+static struct s5p_platform_cec hdmi_cec_data __initdata = {
+
+};
+
+void s5p_cec_cfg_gpio(struct platform_device *pdev)
+{
+	s3c_gpio_cfgpin(EXYNOS4_GPX3(6), S3C_GPIO_SFN(0x3));
+	s3c_gpio_setpull(EXYNOS4_GPX3(6), S3C_GPIO_PULL_NONE);
+}
 
 static void s5p_tv_setup(void)
 {
@@ -821,6 +832,8 @@ static void __init fxi_c210_machine_init(void)
 	s5p_tv_setup();
 	s5p_i2c_hdmiphy_set_platdata(NULL);
 	s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
+
+	s5p_hdmi_cec_set_platdata(&hdmi_cec_data);
 
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
 }

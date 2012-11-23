@@ -45,6 +45,7 @@
 #include <mach/map.h>
 
 #include <plat/cpu.h>
+#include <plat/hdmi.h>
 #include <plat/devs.h>
 #include <plat/adc.h>
 #include <plat/ata.h>
@@ -1361,6 +1362,32 @@ struct platform_device s5p_device_hdmi = {
 	.num_resources	= ARRAY_SIZE(s5p_hdmi_resources),
 	.resource	= s5p_hdmi_resources,
 };
+
+static struct resource s5p_cec_resources[] = {
+	[0] = DEFINE_RES_MEM(S5P_PA_HDMI_CEC, S5P_SZ_HDMI_CEC),
+	[1] = DEFINE_RES_IRQ(IRQ_CEC),
+};
+
+struct platform_device s5p_device_cec = {
+	.name		= "s5p-hdmi-cec",
+	.id		= -1,
+	.num_resources	= ARRAY_SIZE(s5p_cec_resources),
+	.resource	= s5p_cec_resources,
+};
+
+void __init s5p_hdmi_cec_set_platdata(struct s5p_platform_cec *pd)
+{
+	struct s5p_platform_cec *npd;
+
+	npd = kmemdup(pd, sizeof(struct s5p_platform_cec), GFP_KERNEL);
+	if (!npd)
+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+	else {
+		if (!npd->cfg_gpio)
+			npd->cfg_gpio = s5p_cec_cfg_gpio;
+		s5p_device_cec.dev.platform_data = npd;
+	}
+}
 
 static struct resource s5p_sdo_resources[] = {
 	[0] = DEFINE_RES_MEM(S5P_PA_SDO, SZ_64K),

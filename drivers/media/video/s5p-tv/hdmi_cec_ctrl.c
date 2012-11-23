@@ -12,16 +12,19 @@
 
 #include <linux/io.h>
 #include <linux/slab.h>
+#include <linux/platform_device.h>
+#include <linux/videodev2.h>
+#include <linux/irqreturn.h>
+#include <linux/stddef.h>
 
 #include <mach/regs-clock.h>
 #include <mach/regs-clock.h>
 #include <mach/regs-cec.h>
 
-#include "fxi_hdmi_common_lib.h"
-#include "fxi_hdmi_hwif.h"
+#include "cec.h"
 
 #undef tvout_dbg
-
+#define CONFIG_CEC_DEBUG
 #ifdef CONFIG_CEC_DEBUG
 #define tvout_dbg(fmt, ...)					\
 		printk(KERN_INFO "\t\t[CEC] %s(): " fmt,	\
@@ -29,7 +32,6 @@
 #else
 #define tvout_dbg(fmt, ...)
 #endif
-
 
 #define S5P_HDMI_FIN			24000000
 #define CEC_DIV_RATIO			320000
@@ -43,7 +45,6 @@ void __iomem		*cec_base;
 
 struct cec_rx_struct cec_rx_struct;
 struct cec_tx_struct cec_tx_struct;
-
 
 void s5p_cec_set_divider(void)
 {
@@ -210,18 +211,20 @@ void s5p_cec_get_rx_buf(u32 size, u8 *buffer)
 	}
 }
 
-void __init s5p_cec_mem_probe(struct platform_device *pdev)
+int __init s5p_cec_mem_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	size_t	size;
 	int	ret;
+
+	dev_dbg(&pdev->dev, "%s\n", __func__);
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	if (res == NULL) {
 		dev_err(&pdev->dev,
 			"failed to get memory region resource for cec\n");
-		ret = -ENOENT;
+		return -ENOENT;
 	}
 
 	size = (res->end - res->start) + 1;
@@ -230,7 +233,7 @@ void __init s5p_cec_mem_probe(struct platform_device *pdev)
 	if (cec_mem == NULL) {
 		dev_err(&pdev->dev,
 			"failed to get memory region for cec\n");
-		ret = -ENOENT;
+		return -ENOENT;
 	}
 
 	cec_base = ioremap(res->start, size);
@@ -238,8 +241,10 @@ void __init s5p_cec_mem_probe(struct platform_device *pdev)
 	if (cec_base == NULL) {
 		dev_err(&pdev->dev,
 			"failed to ioremap address region for cec\n");
-		ret = -ENOENT;
+		return -ENOENT;
 	}
+
+	return ret;
 }
 
 int __init s5p_cec_mem_release(struct platform_device *pdev)
