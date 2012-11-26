@@ -667,13 +667,6 @@ static struct platform_device btbutton_device_gpiokeys = {
 	},
 };
 
-/* FXI Sysfs */
-
-static struct platform_device fxi_sysfs = {
-  .name = "fxi-sysfs",
-  .id = -1,
-};
-
 static void w1_gpio_pullup_enable(int enable)
 {
 	samsung_gpio_pull_t pull = S3C_GPIO_PULL_NONE;
@@ -757,8 +750,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&fxi_c210_device_bluetooth,
 	&exynos4_device_tmu,
 	&exynos4_device_i2s0,
-  	&btbutton_device_gpiokeys,
-  	&fxi_sysfs,
+	&btbutton_device_gpiokeys,
 	&fxi_w1_gpio,
   	&fxi_fxiid,
 	&fxi_mali,
@@ -786,6 +778,22 @@ static void s5p_tv_setup(void)
 	gpio_request_one(EXYNOS4_GPX3(7), GPIOF_IN, "hpd-plug");
 	s3c_gpio_cfgpin(EXYNOS4_GPX3(7), S3C_GPIO_SFN(0x3));
 	s3c_gpio_setpull(EXYNOS4_GPX3(7), S3C_GPIO_PULL_NONE);
+}
+
+static void setup_power5v_gpio(void)
+{
+	unsigned gpio = EXYNOS4_GPC0(0);
+	if (gpio_request(gpio, "power_5v0")) {
+		printk(KERN_ERR "%s: failed to request gpio for power_5v0\n",
+		       __FUNCTION__);
+		return;
+	}
+	if (gpio_direction_output(gpio, 1))
+		printk(KERN_ERR "%s: failed to set direction for power_5v0\n",
+		       __FUNCTION__);
+	if (gpio_export(gpio, 0))
+		printk(KERN_ERR "%s: failed to export power_5v0\n",
+		       __FUNCTION__);
 }
 
 static void __init fxi_c210_map_io(void)
@@ -835,6 +843,8 @@ static void __init fxi_c210_machine_init(void)
 	s5p_hdmi_set_platdata(&hdmiphy_info, NULL, 0);
 
 	s5p_hdmi_cec_set_platdata(&hdmi_cec_data);
+
+	setup_power5v_gpio();
 
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
 }
