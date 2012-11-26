@@ -39,12 +39,6 @@ enum {
 	// Bluetooth
 	BLUETOOTH_BUTTON,
 
-	// 3G Modem Control Port
-	MODEM_POWER,
-	MODEM_RESET,
-	MODEM_DISABLE1,
-	MODEM_DISABLE2,
-
 	// Status LED Display
 	STATUS_LED_RED,
 	STATUS_LED_GREEN,
@@ -53,9 +47,7 @@ enum {
 	STATUS_LED_NETGREEN,
 
 	// Power Control
-//	SYSTEM_POWER_3V3,     // BUCK6 Enable Control
-	SYSTEM_POWER_5V0,     // USB HOST Power
-	SYSTEM_POWER_12V0,    // VLED Control (Backlight)
+	SYSTEM_POWER_5V0,     // USB HOST, HDMI Power
 
 	GPIO_INDEX_END
 };
@@ -70,15 +62,6 @@ static struct {
 } sControlGpios[] = {
 	{ BLUETOOTH_BUTTON, EXYNOS4_GPX3(5), "bt_button", 0, 0, S3C_GPIO_PULL_UP},
 
-	// High -> Power Enable
-	{ MODEM_POWER, EXYNOS4_GPX1(0), "modem_power", 1, 1, S3C_GPIO_PULL_UP},
-	// Low -> Reset Active
-	{ MODEM_RESET, EXYNOS4_GPX1(1), "modem_reset", 1, 0, S3C_GPIO_PULL_UP},
-	// High -> Disable1 Active
-	{ MODEM_DISABLE1, EXYNOS4_GPX1(2), "modem_disable1", 1, 0, S3C_GPIO_PULL_UP},
-	// High -> Disable2 Active
-	{ MODEM_DISABLE2, EXYNOS4_GPX1(3), "modem_disable2", 1, 0, S3C_GPIO_PULL_UP},
-
 	// STATUS LED : High -> LED ON
 	{ STATUS_LED_RED, EXYNOS4_GPC0(4), "led_red", 1, 0, S3C_GPIO_PULL_DOWN},
 	{ STATUS_LED_GREEN, EXYNOS4_GPC0(3), "led_green", 1, 1, S3C_GPIO_PULL_DOWN},
@@ -87,10 +70,7 @@ static struct {
 	{ STATUS_LED_NETGREEN, EXYNOS4_GPC1(0), "led_netgreen", 1, 0, S3C_GPIO_PULL_DOWN},
 
 	// SYSTEM POWER CONTROL
-//	{ SYSTEM_POWER_3V3, EXYNOS4_GPX3(5), "power_3v3", 1, 1, S3C_GPIO_PULL_DOWN},
 	{ SYSTEM_POWER_5V0, EXYNOS4_GPC0(0), "power_5v0", 1, 1, S3C_GPIO_PULL_DOWN},
-	{ SYSTEM_POWER_12V0, EXYNOS4_GPC0(3), "power_12v0", 1, 1, S3C_GPIO_PULL_DOWN},
-
 };
 
 static ssize_t show_gpio(struct device *dev, struct device_attribute *attr, char *buf)
@@ -141,11 +121,6 @@ static ssize_t show_hdmi(struct device *dev, struct device_attribute *attr, char
 
 static DEVICE_ATTR(bt_button, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
-static DEVICE_ATTR(modem_power, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(modem_reset, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(modem_disable1, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(modem_disable2, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-
 static DEVICE_ATTR(led_red, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 static DEVICE_ATTR(led_green, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 static DEVICE_ATTR(led_blue, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
@@ -153,17 +128,11 @@ static DEVICE_ATTR(led_netred, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 static DEVICE_ATTR(led_netgreen, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
 static DEVICE_ATTR(power_5v0, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(power_12v0, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
 static DEVICE_ATTR(hdmi_state, S_IRUGO | S_IWUSR, show_hdmi, NULL);
 
 static struct attribute *fxi_sysfs_entries[] = {
 	&dev_attr_bt_button.attr,
-
-	&dev_attr_modem_power.attr,
-	&dev_attr_modem_reset.attr,
-	&dev_attr_modem_disable1.attr,
-	&dev_attr_modem_disable2.attr,
 
 	&dev_attr_led_red.attr,
 	&dev_attr_led_green.attr,
@@ -172,7 +141,6 @@ static struct attribute *fxi_sysfs_entries[] = {
 	&dev_attr_led_netgreen.attr,
 
 	&dev_attr_power_5v0.attr,
-	&dev_attr_power_12v0.attr,
 	&dev_attr_hdmi_state.attr,
 	NULL
 };
@@ -215,14 +183,8 @@ void SYSTEM_POWER_CONTROL(int power, int val)
 	int	index;
 
 	switch (power) {
-		/* case 0: */
-		/* 	index = SYSTEM_POWER_3V3; */
-		/* 	break; */
 		case 1:
 			index = SYSTEM_POWER_5V0;
-			break;
-		case 2:
-			index = SYSTEM_POWER_12V0;
 			break;
 		default:
 			return;
