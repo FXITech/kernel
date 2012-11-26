@@ -49,7 +49,6 @@
 #include <mach/map.h>
 
 #include "common.h"
-#include "fxi-sysfs.h"
 
 #define MFC_RBASE 0x43000000
 #define MFC_RSIZE (32 << 20)
@@ -589,16 +588,26 @@ static struct s5p_otg_platdata fxi_c210_otg_pdata;
 
 static struct gpio_led fxi_c210_gpio_leds[] = {
 	{
-		.name			= "fxi_c210::status1",
-		.default_trigger	= "heartbeat",
-		.gpio			= EXYNOS4_GPX1(3),
-		.active_low		= 1,
+		.name = "fxi-ccandy:red:",
+		.default_trigger = "heartbeat",
+		.gpio = EXYNOS4_GPC0(4),
 	},
 	{
-		.name			= "fxi_c210::status2",
-		.default_trigger	= "mmc0",
-		.gpio			= EXYNOS4_GPX1(4),
-		.active_low		= 1,
+		.name = "fxi-ccandy:green:power",
+		.gpio = EXYNOS4_GPC0(3),
+		.default_state = LEDS_GPIO_DEFSTATE_ON,
+	},
+	{
+		.name = "fxi-ccandy:blue:",
+		.gpio = EXYNOS4_GPC0(2),
+	},
+	{
+		.name = "fxi-ccandy:orange:net",
+		.gpio = EXYNOS4_GPC0(1),
+	},
+	{
+		.name = "fxi-ccandy:green:net",
+		.gpio = EXYNOS4_GPC1(0),
 	},
 };
 
@@ -788,7 +797,6 @@ static void __init fxi_c210_reserve(void)
 
 static void __init fxi_c210_machine_init(void)
 {
-	fxi_led_control(LED_GREEN, LED_ON);
 	fxi_c210_power_init();
 
 	s3c_i2c0_set_platdata(NULL);

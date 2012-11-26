@@ -22,8 +22,6 @@
 #include <mach/regs-gpio.h>
 #include <plat/gpio-cfg.h>
 
-#include "fxi-sysfs.h"
-
 #define DEBUG_PM_MSG
 #define SLEEP_DISABLE_FLAG
 
@@ -38,13 +36,6 @@ static struct wake_lock sleep_wake_lock;
 enum {
 	// Bluetooth
 	BLUETOOTH_BUTTON,
-
-	// Status LED Display
-	STATUS_LED_RED,
-	STATUS_LED_GREEN,
-	STATUS_LED_BLUE,
-	STATUS_LED_NETRED,
-	STATUS_LED_NETGREEN,
 
 	// Power Control
 	SYSTEM_POWER_5V0,     // USB HOST, HDMI Power
@@ -62,12 +53,6 @@ static struct {
 } sControlGpios[] = {
 	{ BLUETOOTH_BUTTON, EXYNOS4_GPX3(5), "bt_button", 0, 0, S3C_GPIO_PULL_UP},
 
-	// STATUS LED : High -> LED ON
-	{ STATUS_LED_RED, EXYNOS4_GPC0(4), "led_red", 1, 0, S3C_GPIO_PULL_DOWN},
-	{ STATUS_LED_GREEN, EXYNOS4_GPC0(3), "led_green", 1, 1, S3C_GPIO_PULL_DOWN},
-	{ STATUS_LED_BLUE, EXYNOS4_GPC0(2), "led_blue", 1, 0, S3C_GPIO_PULL_DOWN},
-	{ STATUS_LED_NETRED, EXYNOS4_GPC0(1), "led_netred", 1, 0, S3C_GPIO_PULL_DOWN},
-	{ STATUS_LED_NETGREEN, EXYNOS4_GPC1(0), "led_netgreen", 1, 0, S3C_GPIO_PULL_DOWN},
 
 	// SYSTEM POWER CONTROL
 	{ SYSTEM_POWER_5V0, EXYNOS4_GPC0(0), "power_5v0", 1, 1, S3C_GPIO_PULL_DOWN},
@@ -121,24 +106,12 @@ static ssize_t show_hdmi(struct device *dev, struct device_attribute *attr, char
 
 static DEVICE_ATTR(bt_button, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
-static DEVICE_ATTR(led_red, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(led_green, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(led_blue, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(led_netred, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-static DEVICE_ATTR(led_netgreen, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-
 static DEVICE_ATTR(power_5v0, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
 static DEVICE_ATTR(hdmi_state, S_IRUGO | S_IWUSR, show_hdmi, NULL);
 
 static struct attribute *fxi_sysfs_entries[] = {
 	&dev_attr_bt_button.attr,
-
-	&dev_attr_led_red.attr,
-	&dev_attr_led_green.attr,
-	&dev_attr_led_blue.attr,
-	&dev_attr_led_netred.attr,
-	&dev_attr_led_netgreen.attr,
 
 	&dev_attr_power_5v0.attr,
 	&dev_attr_hdmi_state.attr,
@@ -149,34 +122,6 @@ static struct attribute_group fxi_sysfs_attr_group = {
 	.name   = NULL,
 	.attrs  = fxi_sysfs_entries,
 };
-
-void fxi_led_control(int led, int val)
-{
-	int index;
-
-	switch (led) {
-		case LED_RED:
-			index = STATUS_LED_RED;
-			break;
-		case LED_GREEN:
-			index = STATUS_LED_GREEN;
-			break;
-		case LED_BLUE:
-			index = STATUS_LED_BLUE;
-			break;
-		case LED_NETRED:
-			index = STATUS_LED_NETRED;
-			break;
-		case LED_NETGREEN:
-			index = STATUS_LED_NETGREEN;
-			break;
-		default:
-			return;
-	}
-
-	gpio_set_value(sControlGpios[index].gpio, !!val);
-}
-EXPORT_SYMBOL(fxi_led_control);
 
 void SYSTEM_POWER_CONTROL(int power, int val)
 {
@@ -260,11 +205,6 @@ static int fxi_sysfs_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void fxi_sysfs_shutdown(struct platform_device *pdev)
-{
-	fxi_led_control(LED_GREEN, 0);
-}
-
 static struct platform_driver fxi_sysfs_driver = {
 	.driver = {
 		.name = "fxi-sysfs",
@@ -272,7 +212,6 @@ static struct platform_driver fxi_sysfs_driver = {
 	},
 	.probe = fxi_sysfs_probe,
 	.remove = fxi_sysfs_remove,
-	.shutdown = fxi_sysfs_shutdown,
 	.suspend = fxi_sysfs_suspend,
 	.resume = fxi_sysfs_resume,
 };
