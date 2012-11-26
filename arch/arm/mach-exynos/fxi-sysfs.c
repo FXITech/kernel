@@ -34,9 +34,6 @@ static struct wake_lock sleep_wake_lock;
 
 // GPIO Index Define
 enum {
-	// Bluetooth
-	BLUETOOTH_BUTTON,
-
 	// Power Control
 	SYSTEM_POWER_5V0,     // USB HOST, HDMI Power
 
@@ -51,9 +48,6 @@ static struct {
 	int value;      // Default Value(only for output)
 	int pud;        // Pull up/down register setting : S3C_GPIO_PULL_DOWN, UP, NONE
 } sControlGpios[] = {
-	{ BLUETOOTH_BUTTON, EXYNOS4_GPX3(5), "bt_button", 0, 0, S3C_GPIO_PULL_UP},
-
-
 	// SYSTEM POWER CONTROL
 	{ SYSTEM_POWER_5V0, EXYNOS4_GPC0(0), "power_5v0", 1, 1, S3C_GPIO_PULL_DOWN},
 };
@@ -104,15 +98,11 @@ static ssize_t show_hdmi(struct device *dev, struct device_attribute *attr, char
 		return sprintf(buf, "off\n");
 }
 
-static DEVICE_ATTR(bt_button, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
-
 static DEVICE_ATTR(power_5v0, S_IRUGO | S_IWUSR, show_gpio, set_gpio);
 
 static DEVICE_ATTR(hdmi_state, S_IRUGO | S_IWUSR, show_hdmi, NULL);
 
 static struct attribute *fxi_sysfs_entries[] = {
-	&dev_attr_bt_button.attr,
-
 	&dev_attr_power_5v0.attr,
 	&dev_attr_hdmi_state.attr,
 	NULL

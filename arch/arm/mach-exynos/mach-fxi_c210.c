@@ -20,7 +20,6 @@
 #include <linux/regulator/machine.h>
 #include <linux/mfd/max8997.h>
 #include <linux/rfkill-gpio.h>
-#include <linux/gpio_keys.h>
 #include <linux/pm_domain.h>
 #include <linux/w1-gpio.h>
 
@@ -644,26 +643,28 @@ static struct platform_device fxi_c210_device_bluetooth = {
 
 /* Bluetooth button */
 static struct gpio_keys_button btbutton[] = {
-  [0] = {
-    .desc   = "Bluetooth button",
-    .code   = KEY_RECORD,
-    .type   = EV_KEY,
-    .gpio   = EXYNOS4_GPX3(5),
-    .wakeup = 0,
-  },
+	[0] = {
+		.desc   = "Bluetooth button",
+		.code   = KEY_RECORD,
+		.type   = EV_KEY,
+		.gpio   = EXYNOS4_GPX3(5),
+		.active_low = 1,
+		.wakeup = 1,
+		.debounce_interval = 1,
+	},
 };
 
 static struct gpio_keys_platform_data bt_gpio_keys_data = {
-  .buttons        = btbutton,
-  .nbuttons       = 1,
+	.buttons        = btbutton,
+	.nbuttons       = 1,
 };
  
 static struct platform_device btbutton_device_gpiokeys = {
-  .name      = "gpio-keys",
-  .id      = -1,
-  .dev = {
-    .platform_data = &bt_gpio_keys_data,
-  },
+	.name      = "gpio-keys",
+	.id      = -1,
+	.dev = {
+		.platform_data = &bt_gpio_keys_data,
+	},
 };
 
 /* FXI Sysfs */
