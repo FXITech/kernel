@@ -24,6 +24,7 @@ struct ccandy_device {
 	u32 sample_width;
 	u32 bps;
 	u32 rate;
+	u32 jiffies_per_period;
 
 	unsigned long last_jiffies;
 	snd_pcm_uframes_t previous_playback_position;

@@ -59,6 +59,17 @@ static int ccandy_hw_free(struct snd_pcm_substream *substream)
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
+static u32 jiffies_per_period(struct ccandy_device *dev)
+{
+	const u32 msecs_per_jiffie = jiffies_to_msecs(1);
+	u32 period_size = bytes_to_frames(dev->substream->runtime,
+					dev->pcm_period_size);
+	u32 rate = dev->rate;
+	u32 msecs_pr_period = (period_size * 1000) / rate;
+
+	return msecs_pr_period / msecs_per_jiffie;
+}
+
 static int ccandy_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -73,6 +84,7 @@ static int ccandy_prepare(struct snd_pcm_substream *substream)
 	dev->rate = runtime->rate;
 	dev->bps = dev->sample_width * runtime->rate;
 
+	dev->jiffies_per_period = jiffies_per_period(dev);
 	dev->last_jiffies = jiffies;
 	dev->running = 0;
 
@@ -85,22 +97,10 @@ static int ccandy_prepare(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static u32 jiffies_per_period(struct ccandy_device *dev)
-{
-	const u32 msecs_per_jiffie = jiffies_to_msecs(1);
-	u32 period_size = bytes_to_frames(dev->substream->runtime,
-					  dev->pcm_period_size);
-	u32 rate = dev->rate;
-	u32 msecs_pr_period = (period_size * 1000) / rate;
-
-	return msecs_pr_period / msecs_per_jiffie;
-}
 
 static void ccandy_timer_start(struct ccandy_device *dev)
 {
-	const u32 jifs_per_period = jiffies_per_period(dev) + 1;
-	s32 timeout = jifs_per_period - dev->timeout_adjust;
-
+	s32 timeout = dev->jiffies_per_period - dev->timeout_adjust;
 	dev->timer.expires = jiffies + timeout;
 	pr_debug("%s (setting up timer to timeout @ %d jiffies from now)\n",
 		 __func__, timeout);
@@ -146,8 +146,8 @@ static long jiffies_elapsed(struct ccandy_device* dev)
 {
 	if (jiffies >= dev->last_jiffies)
 		return jiffies - dev->last_jiffies;
-	else  /* jiffies counter has wrapped around */
-		return 0; /* ok for our use */
+	else /* wraparound */
+		return 0xffffffff - dev->last_jiffies + jiffies;
 }
 
 static unsigned long fill_buf(unsigned long pos, unsigned long end,
@@ -250,11 +250,13 @@ static long position_update(struct ccandy_device *dev)
 		return num_bytes;
 
 	qcount = 0;
+
 	list_for_each(dummy, &dev->capture_q)
 		qcount++;
 
 	/* No data captured, generate silence */
 	if (!qcount && !dev->previous_q_count) {
+		dev->last_jiffies += jiffies_elapsed(dev);
 		clear_capture_buf(dev);
 		dev->previous_q_count = qcount;
 		return num_bytes;
@@ -266,20 +268,17 @@ static long position_update(struct ccandy_device *dev)
 
 	/* We've got no data, but still don't want to generate silence..
 	   Most probably there will be in the next pcm period */
-	if (!qcount) {
-		/* Here we return period_size - 1 to minimize the
-		   timeout time for next call */
-		return dev->pcm_period_size - 1;
-	}
+	if (!qcount)
+		return 0;
 
 	/* Get captured playback data */
 	spin_lock_irqsave(&dev->lock, flags);
 	{
 		struct list_head *next;
 		if (list_empty(&dev->capture_q)) {
+			spin_unlock_irqrestore(&dev->lock, flags);
 			pr_err("Capture queue is empty. It shouldn't be.\n");
 			msg = NULL;
-			spin_unlock_irqrestore(&dev->lock, flags);
 			return 0;
 		}
 
@@ -294,13 +293,14 @@ static long position_update(struct ccandy_device *dev)
 		return 0;
 	}
 
+	dev->last_jiffies += jiffies_elapsed(dev);
 	fill_capture_buf(dev, msg);
 
 	spin_lock_irqsave(&dev->lock, flags);
 	list_del(&msg->qnode);
+	spin_unlock_irqrestore(&dev->lock, flags);
 	kfree(msg->data);
 	kfree(msg);
-	spin_unlock_irqrestore(&dev->lock, flags);
 
 	return num_bytes;
 }
@@ -319,6 +319,8 @@ static void ccandy_timer_callback(unsigned long data)
 {
 	struct ccandy_device *dev = (struct ccandy_device *) data;
 	long num;
+
+	pr_debug("%s, jiffie diff = %d\n", __func__, jiffies_elapsed(dev));
 
 	if (!dev->running)
 		return;
@@ -340,22 +342,19 @@ static void ccandy_timer_callback(unsigned long data)
 	num = position_update(dev);
 	if (num >= dev->pcm_period_size)
 	{
-		long extra_bytes = num - dev->pcm_period_size;
-		long rate = dev->rate;
-		long msecs = bytes_to_frames(dev->substream->runtime,
-					     extra_bytes) * 1000 / rate;
-		dev->extra_bytes = extra_bytes;
+		long msecs;
+		dev->extra_bytes = num - dev->pcm_period_size;
+		msecs = bytes_to_frames(dev->substream->runtime,
+					dev->extra_bytes) * 1000 / dev->rate;
 		dev->timeout_adjust = msecs_to_jiffies(msecs);
-		dev->last_jiffies = jiffies;
 
-		pr_debug("%s (timeout_adjust = %lu)\n",
-			 __func__, dev->timeout_adjust);
+		pr_debug("%s (timeout_adjust = %lu, extra_bytes = %ld\n",
+			 __func__, dev->timeout_adjust, dev->extra_bytes);
 
 		/* Inform the pcm subsystem and let it call
 		   our pointer position callback */
 		snd_pcm_period_elapsed(dev->substream);
 	}
-
 	ccandy_timer_start(dev);
 }
 
