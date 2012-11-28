@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 
 #include <linux/time.h>
+#include "fxi_char_dev.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -37,10 +38,6 @@ enum CommandStates {
 	DATA
 };
 
-enum RequestTypes {
-	FXINONE, FXIREAD, FXIWRITE
-};
-
 // represents one request in the request queue
 struct FxiRequest {
 	struct task_struct *task;
@@ -50,23 +47,6 @@ struct FxiRequest {
 	void *buf;
 	void *writeBuf;
 };
-
-///////////////////////////////////////////////////////////////////////////////
-// IOCTLs
-
-#define BLOCK_DONE 0xad1
-#define IN 0xad2
-#define OUT1 0xad3
-#define OUT2 0xad4
-#define PRELOAD 0xad5
-#define BATCHSIZE 0xad6
-#define DATACMD 0xad7
-#define IMPACK 0xad8
-#define READY 0xad9
-#define HASDATA 0xada
-#define DISABLE_POLL 0xadb
-
-///////////////////////////////////////////////////////////////////////////////
 
 static struct device *fxidev;
 
@@ -522,7 +502,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 			      unsigned long arg) {
 	switch (cmd) {
 
-	case READY: {
+	case FXI_CHAR_DEV_IOCTL_READY: {
 		unsigned long flags;
 
 		// lock
@@ -542,7 +522,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		break;
 	}
 
-	case BLOCK_DONE: {
+	case FXI_CHAR_DEV_IOCTL_BLOCK_DONE: {
 		unsigned long flags;
 
 		dev_dbg(fxidev, "BLOCK_DONE\n");
@@ -577,37 +557,37 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		break;
 	}
 
-	case IN:
+	case FXI_CHAR_DEV_IOCTL_IN:
 		inBlock = arg;
 		dev_dbg(fxidev, "inblock: %x\n", inBlock);
 		break;
 
-	case OUT1:
+	case FXI_CHAR_DEV_IOCTL_OUT1:
 		outBlock1 = arg;
 		dev_dbg(fxidev, "outblock1: %x\n", outBlock1);
 		break;
 
-	case OUT2:
+	case FXI_CHAR_DEV_IOCTL_OUT2:
 		outBlock2 = arg;
 		dev_dbg(fxidev, "outblock2: %x\n", outBlock2);
 		break;
 
-	case PRELOAD:
+	case FXI_CHAR_DEV_IOCTL_PRELOAD:
 		batchValid = false;
 		preload = true;
 		curOutBlock = outBlock1;
 		dev_dbg(fxidev, "starting preload mode\n");
 		break;
 
-	case BATCHSIZE:
+	case FXI_CHAR_DEV_IOCTL_BATCHSIZE:
 		batchSize = arg;
 		break;
 
-	case IMPACK:
+	case FXI_CHAR_DEV_IOCTL_IMPACK:
 		impAck = true;
 		break;
 
-	case HASDATA:
+	case FXI_CHAR_DEV_IOCTL_HASDATA:
 		if (!currentRequest && queueSize()) {
 			unsigned long flags;
 
@@ -628,7 +608,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		else return 0;
 		break;
 
-	case DISABLE_POLL: {
+	case FXI_CHAR_DEV_IOCTL_DISABLE_POLL: {
 		unsigned long flags;
 
 		// lock
