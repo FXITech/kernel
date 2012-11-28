@@ -39,26 +39,26 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 enum PacketTypes {
-  NODATA, DATAPACKET, MARK, INIT, NACK, ACK = 0x80
+	NODATA, DATAPACKET, MARK, INIT, NACK, ACK = 0x80
 };
 
 enum CommandStates {
-  COMMAND,
-  DATA
+	COMMAND,
+	DATA
 };
 
 enum RequestTypes {
-  FXINONE, FXIREAD, FXIWRITE
+	FXINONE, FXIREAD, FXIWRITE
 };
 
 // represents one request in the request queue
 struct FxiRequest {
-  struct task_struct *task;
-  unsigned long type;
-  unsigned long addr;
-  signed long len;
-  void *buf;
-  void *writeBuf;
+	struct task_struct *task;
+	unsigned long type;
+	unsigned long addr;
+	signed long len;
+	void *buf;
+	void *writeBuf;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -121,279 +121,279 @@ static DEFINE_MUTEX(fxichardevmutex);
 static spinlock_t fxichardevlock;
 
 static int queueSize (void) {
-  if (lastReq < 0) return 0;
-  else if (lastReq == firstReq) return MAX_REQUESTS;
-  else if (lastReq > firstReq) return lastReq - firstReq;
-  else return lastReq + (MAX_REQUESTS - firstReq);
+	if (lastReq < 0) return 0;
+	else if (lastReq == firstReq) return MAX_REQUESTS;
+	else if (lastReq > firstReq) return lastReq - firstReq;
+	else return lastReq + (MAX_REQUESTS - firstReq);
 }
 
 static struct FxiRequest *queueInsert (void) {
-  struct FxiRequest *req;
+	struct FxiRequest *req;
 
-  if (queueSize() >= MAX_REQUESTS) {
-    return NULL;
-  }
+	if (queueSize() >= MAX_REQUESTS) {
+		return NULL;
+	}
 
-  if (lastReq < 0) lastReq = firstReq;
+	if (lastReq < 0) lastReq = firstReq;
 
-  PDEBUG ("insert %d (%d)\n", lastReq, queueSize() + 1);
+	PDEBUG ("insert %d (%d)\n", lastReq, queueSize() + 1);
 
-  req = &requestQueue[lastReq];
-  lastReq = (lastReq + 1) % MAX_REQUESTS;
+	req = &requestQueue[lastReq];
+	lastReq = (lastReq + 1) % MAX_REQUESTS;
 
-  return req;
+	return req;
 }
 
 void queueActivate (void) {
-  if (!polling) {
-    PDEBUG2 ("send SIGIO, start poll\n");
-    polling = true;
-    kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
-  }
+	if (!polling) {
+		PDEBUG2 ("send SIGIO, start poll\n");
+		polling = true;
+		kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
+	}
 }
 
 static struct FxiRequest *queueFront (void) {
-  struct FxiRequest *req;
+	struct FxiRequest *req;
 
-  PDEBUG ("getting %d\n", firstReq);
+	PDEBUG ("getting %d\n", firstReq);
 
-  req = &requestQueue[firstReq];
+	req = &requestQueue[firstReq];
 
-  return req;
+	return req;
 }
 
 static void queueRemove (void) {
-  unsigned long flags;
+	unsigned long flags;
 
-  // lock
-  if (!in_irq()) mutex_lock (&fxichardevmutex);
-  spin_lock_irqsave (&fxichardevlock, flags);
+	// lock
+	if (!in_irq()) mutex_lock (&fxichardevmutex);
+	spin_lock_irqsave (&fxichardevlock, flags);
 
-  PDEBUG ("remove %d\n", queueSize() - 1);
+	PDEBUG ("remove %d\n", queueSize() - 1);
 
-  firstReq = (firstReq + 1) % MAX_REQUESTS;
+	firstReq = (firstReq + 1) % MAX_REQUESTS;
 
-  if (firstReq == lastReq) {
-    // queue empty
-    lastReq = -1;
-  }
+	if (firstReq == lastReq) {
+		// queue empty
+		lastReq = -1;
+	}
 
-  // unlock
-  spin_unlock_irqrestore (&fxichardevlock, flags);
-  if (!in_irq()) mutex_unlock (&fxichardevmutex);
+	// unlock
+	spin_unlock_irqrestore (&fxichardevlock, flags);
+	if (!in_irq()) mutex_unlock (&fxichardevmutex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // handling requests from USB subsystem
 
 static void sleepThread (unsigned long flags) {
-  PDEBUG ("Sleeping %x\n", current);
-  while (!awake) {
-    fxiSleepingTask = current;
-    set_current_state (TASK_INTERRUPTIBLE);
+	PDEBUG ("Sleeping %x\n", current);
+	while (!awake) {
+		fxiSleepingTask = current;
+		set_current_state (TASK_INTERRUPTIBLE);
 
-    // unlock
-    spin_unlock_irqrestore (&fxichardevlock, flags);
-    if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		// unlock
+		spin_unlock_irqrestore (&fxichardevlock, flags);
+		if (!in_irq()) mutex_unlock (&fxichardevmutex);
 
-    schedule();
+		schedule();
 
-    // lock
-    if (!in_irq()) mutex_lock (&fxichardevmutex);
-    spin_lock_irqsave (&fxichardevlock, flags);
-  }
+		// lock
+		if (!in_irq()) mutex_lock (&fxichardevmutex);
+		spin_lock_irqsave (&fxichardevlock, flags);
+	}
 }
 
 static void sleepReq (struct FxiRequest *req, unsigned long flags) {
-  PDEBUG ("Sleeping req %x\n", current);
-  while (!awake) {
-    req->task = current;
-    set_current_state (TASK_INTERRUPTIBLE);
+	PDEBUG ("Sleeping req %x\n", current);
+	while (!awake) {
+		req->task = current;
+		set_current_state (TASK_INTERRUPTIBLE);
 
-    // unlock
-    spin_unlock_irqrestore (&fxichardevlock, flags);
-    if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		// unlock
+		spin_unlock_irqrestore (&fxichardevlock, flags);
+		if (!in_irq()) mutex_unlock (&fxichardevmutex);
 
-    schedule();
+		schedule();
 
-    // lock
-    if (!in_irq()) mutex_lock (&fxichardevmutex);
-    spin_lock_irqsave (&fxichardevlock, flags);
-  }
+		// lock
+		if (!in_irq()) mutex_lock (&fxichardevmutex);
+		spin_lock_irqsave (&fxichardevlock, flags);
+	}
 }
 
 static inline void *nextBlock (int blocks) {
-  void *ptr = batch[batchBlockPointer % batchSize];
-  batchBlockPointer += blocks;
-  return ptr;
+	void *ptr = batch[batchBlockPointer % batchSize];
+	batchBlockPointer += blocks;
+	return ptr;
 }
 
 // called by gadget driver whenever there is a request (read of write)
 // from the host
 void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 
-  PDEBUG2 ("fxirequest %ld %ld %d (queue: %d) - %x\n",
-           type, addr, size, queueSize(), buf);
+	PDEBUG2 ("fxirequest %ld %ld %d (queue: %d) - %x\n",
+		 type, addr, size, queueSize(), buf);
 
-  // wait if fusionx daemon is not up yet
-  if (!daemonUp) {
-    printk (KERN_WARNING DEVNAME ": waiting for daemon\n");
-    
-    while (!daemonUp) {
-      unsigned long flags;
-      local_irq_save (flags);
+	// wait if fusionx daemon is not up yet
+	if (!daemonUp) {
+		printk (KERN_WARNING DEVNAME ": waiting for daemon\n");
 
-      fxiSleepingTask = current;
-      set_current_state (TASK_INTERRUPTIBLE);
+		while (!daemonUp) {
+			unsigned long flags;
+			local_irq_save (flags);
 
-      local_irq_restore (flags);
+			fxiSleepingTask = current;
+			set_current_state (TASK_INTERRUPTIBLE);
 
-      schedule();
-    }
+			local_irq_restore (flags);
 
-    printk (KERN_WARNING DEVNAME ": daemon connected\n");
-  }    
+			schedule();
+		}
 
-  if (type == FXIWRITE) {
-    while (size) {
-      unsigned long flags;
-      struct FxiRequest *req;
-      int bytes = size;
+		printk (KERN_WARNING DEVNAME ": daemon connected\n");
+	}
 
-      if (bytes > MAX_BUF_SIZE) bytes = MAX_BUF_SIZE;
+	if (type == FXIWRITE) {
+		while (size) {
+			unsigned long flags;
+			struct FxiRequest *req;
+			int bytes = size;
 
-      // lock
-      if (!in_irq()) mutex_lock (&fxichardevmutex);
-      spin_lock_irqsave (&fxichardevlock, flags);
+			if (bytes > MAX_BUF_SIZE) bytes = MAX_BUF_SIZE;
 
-      while (!(req = queueInsert())) {
-        PDEBUG ("Sleeping due to full queue\n");
+			// lock
+			if (!in_irq()) mutex_lock (&fxichardevmutex);
+			spin_lock_irqsave (&fxichardevlock, flags);
 
-        awake = 0;
+			while (!(req = queueInsert())) {
+				PDEBUG ("Sleeping due to full queue\n");
 
-        sleepThread (flags);
-      }
+				awake = 0;
 
-      {
-        unsigned char *block = buf;
-        if ((addr >= inBlock) && (block[0] & ACK)) {
-          // ACK, get new batch
-          batchValid = false;
-        }
-        if ((addr >= inBlock) && (block[0] == NACK)) {
-          // NACK, get a previous batch
-          batchValid = false;
-        }
-      }
+				sleepThread (flags);
+			}
 
-      // build request
-      req->task = NULL;
-      req->addr = addr;
-      req->type = type;
-      req->len = bytes;
-      req->buf = req->writeBuf;
+			{
+				unsigned char *block = buf;
+				if ((addr >= inBlock) && (block[0] & ACK)) {
+					// ACK, get new batch
+					batchValid = false;
+				}
+				if ((addr >= inBlock) && (block[0] == NACK)) {
+					// NACK, get a previous batch
+					batchValid = false;
+				}
+			}
 
-      memcpy (req->writeBuf, buf, bytes);
+			// build request
+			req->task = NULL;
+			req->addr = addr;
+			req->type = type;
+			req->len = bytes;
+			req->buf = req->writeBuf;
 
-      // update variables for next request
-      // (if this is longer than a single request)
-      size -= bytes;
-      buf += bytes;
-      addr += bytes / FXI_BLOCK_SIZE;
+			memcpy (req->writeBuf, buf, bytes);
 
-      queueActivate();
+			// update variables for next request
+			// (if this is longer than a single request)
+			size -= bytes;
+			buf += bytes;
+			addr += bytes / FXI_BLOCK_SIZE;
 
-      // unlock
-      spin_unlock_irqrestore (&fxichardevlock, flags);
-      if (!in_irq()) mutex_unlock (&fxichardevmutex);
-    }
+			queueActivate();
 
-  } else { // FXIREAD
+			// unlock
+			spin_unlock_irqrestore (&fxichardevlock, flags);
+			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		}
 
-    if ((addr >= outBlock1) && preload) {
+	} else { // FXIREAD
 
-      if (impAck && (((addr >= outBlock2) && (curOutBlock == outBlock1)) ||
-                     ((addr < outBlock2) && (curOutBlock == outBlock2)))) {
-        // implicit ACK, get new batch
-        batchValid = false;
-        curOutBlock = curOutBlock == outBlock1 ? outBlock2 : outBlock1;
-      }
-    
-      if (!batchValid) {
-        unsigned long flags;
-        struct FxiRequest *req;
+		if ((addr >= outBlock1) && preload) {
 
-        // lock
-        if (!in_irq()) mutex_lock (&fxichardevmutex);
-        spin_lock_irqsave (&fxichardevlock, flags);
+			if (impAck && (((addr >= outBlock2) && (curOutBlock == outBlock1)) ||
+				       ((addr < outBlock2) && (curOutBlock == outBlock2)))) {
+				// implicit ACK, get new batch
+				batchValid = false;
+				curOutBlock = curOutBlock == outBlock1 ? outBlock2 : outBlock1;
+			}
 
-        while (!(req = queueInsert())) {
-          PDEBUG ("Sleeping due to full queue\n");
+			if (!batchValid) {
+				unsigned long flags;
+				struct FxiRequest *req;
 
-          awake = 0;
+				// lock
+				if (!in_irq()) mutex_lock (&fxichardevmutex);
+				spin_lock_irqsave (&fxichardevlock, flags);
 
-          sleepThread (flags);
-        }
+				while (!(req = queueInsert())) {
+					PDEBUG ("Sleeping due to full queue\n");
 
-        req->task = NULL;
-        req->addr = addr;
-        req->type = type;
-        req->buf = batch;
-        req->len = FXI_BLOCK_SIZE * FXI_MAX_BLOCKS;
+					awake = 0;
 
-        batchBlockPointer = 0;
-        awake = 0;
-        queueActivate();
+					sleepThread (flags);
+				}
 
-        sleepReq (req, flags);
+				req->task = NULL;
+				req->addr = addr;
+				req->type = type;
+				req->buf = batch;
+				req->len = FXI_BLOCK_SIZE * FXI_MAX_BLOCKS;
 
-        // unlock
-        spin_unlock_irqrestore (&fxichardevlock, flags);
-        if (!in_irq()) mutex_unlock (&fxichardevmutex);
+				batchBlockPointer = 0;
+				awake = 0;
+				queueActivate();
 
-        batchValid = true;
-      }
+				sleepReq (req, flags);
 
-      memcpy (buf, nextBlock (size / FXI_BLOCK_SIZE), size);
+				// unlock
+				spin_unlock_irqrestore (&fxichardevlock, flags);
+				if (!in_irq()) mutex_unlock (&fxichardevmutex);
 
-      if (*(uint32_t*)buf == 0) {
-        // empty batch, need to fetch new batch next time
-        batchBlockPointer = 0;
-        batchValid = false;
-      }
+				batchValid = true;
+			}
 
-    } else {
-      unsigned long flags;
-      struct FxiRequest *req;
+			memcpy (buf, nextBlock (size / FXI_BLOCK_SIZE), size);
 
-      // lock
-      if (!in_irq()) mutex_lock (&fxichardevmutex);
-      spin_lock_irqsave (&fxichardevlock, flags);
+			if (*(uint32_t*)buf == 0) {
+				// empty batch, need to fetch new batch next time
+				batchBlockPointer = 0;
+				batchValid = false;
+			}
 
-      while (!(req = queueInsert())) {
-        PDEBUG ("Sleeping due to full queue\n");
+		} else {
+			unsigned long flags;
+			struct FxiRequest *req;
 
-        awake = 0;
+			// lock
+			if (!in_irq()) mutex_lock (&fxichardevmutex);
+			spin_lock_irqsave (&fxichardevlock, flags);
 
-        sleepThread (flags);
-      }
+			while (!(req = queueInsert())) {
+				PDEBUG ("Sleeping due to full queue\n");
 
-      req->task = NULL;
-      req->addr = addr;
-      req->type = type;
-      req->buf = buf;
-      req->len = size;
+				awake = 0;
 
-      awake = 0;
-      queueActivate();
+				sleepThread (flags);
+			}
 
-      sleepReq (req, flags);
+			req->task = NULL;
+			req->addr = addr;
+			req->type = type;
+			req->buf = buf;
+			req->len = size;
 
-      // unlock
-      spin_unlock_irqrestore (&fxichardevlock, flags);
-      if (!in_irq()) mutex_unlock (&fxichardevmutex);
-    }
-  }
+			awake = 0;
+			queueActivate();
+
+			sleepReq (req, flags);
+
+			// unlock
+			spin_unlock_irqrestore (&fxichardevlock, flags);
+			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		}
+	}
 }
 EXPORT_SYMBOL_GPL(fxi_request);
 
@@ -401,36 +401,36 @@ EXPORT_SYMBOL_GPL(fxi_request);
 // fops
 
 static int fxichardev_open (struct inode *inode, struct file *filp) {
-  if (!atomic_dec_and_test (&fxichardev_available)) {
-    // already open, do not allow multiple opens
-    atomic_inc (&fxichardev_available);
-    return -EBUSY; 
-  }
+	if (!atomic_dec_and_test (&fxichardev_available)) {
+		// already open, do not allow multiple opens
+		atomic_inc (&fxichardev_available);
+		return -EBUSY;
+	}
 
-  return 0;
+	return 0;
 }
 
 static int fxichardev_release (struct inode *inode, struct file *filp) {
-  atomic_inc (&fxichardev_available);
+	atomic_inc (&fxichardev_available);
 
-  return 0;
+	return 0;
 }
 
 static int fxichardev_mmap(struct file *file, struct vm_area_struct *vma) {
-  printk (KERN_WARNING DEVNAME ": mmap\n");
+	printk (KERN_WARNING DEVNAME ": mmap\n");
 
 	unsigned long start = vma->vm_start;
 	unsigned long size = vma->vm_end - vma->vm_start;
-  dma_addr_t handle;
+	dma_addr_t handle;
 
 	void *mem = dma_alloc_coherent (fxidev, size, &handle, GFP_KERNEL);
-  
-  printk ("Allocated: %x %x\n", mem, handle);
 
-  if (!mem) {
-    printk (KERN_WARNING "Can't allocate memory\n");
-    return -ENOMEM;
-  }
+	printk ("Allocated: %x %x\n", mem, handle);
+
+	if (!mem) {
+		printk (KERN_WARNING "Can't allocate memory\n");
+		return -ENOMEM;
+	}
 
 	unsigned long pos = (unsigned long)mem;
 
@@ -453,228 +453,228 @@ static int fxichardev_mmap(struct file *file, struct vm_area_struct *vma) {
 }
 
 static ssize_t fxichardev_read (struct file *filp, char __user *buf,
-                                size_t count, loff_t *f_pos) {
-  switch (commandState) {
+				size_t count, loff_t *f_pos) {
+	switch (commandState) {
 
-    case COMMAND: 
-      PDEBUG2 ("read command %d\n", count);
+	case COMMAND:
+		PDEBUG2 ("read command %d\n", count);
 
-      if (!currentRequest && queueSize()) {
-        unsigned long flags;
+		if (!currentRequest && queueSize()) {
+			unsigned long flags;
 
-        // lock
-        if (!in_irq()) mutex_lock (&fxichardevmutex);
-        spin_lock_irqsave (&fxichardevlock, flags);
+			// lock
+			if (!in_irq()) mutex_lock (&fxichardevmutex);
+			spin_lock_irqsave (&fxichardevlock, flags);
 
-        // fetch
-        currentRequest = queueFront();
+			// fetch
+			currentRequest = queueFront();
 
-        // unlock
-        spin_unlock_irqrestore (&fxichardevlock, flags);
-        if (!in_irq()) mutex_unlock (&fxichardevmutex);
-      }
+			// unlock
+			spin_unlock_irqrestore (&fxichardevlock, flags);
+			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		}
 
-      if (count == 3 * sizeof (unsigned long)) {
-        unsigned long req[3];
+		if (count == 3 * sizeof (unsigned long)) {
+			unsigned long req[3];
 
-        if (!currentRequest) {
-          req[0] = FXINONE;
-          req[1] = 0;
-          req[2] = 0;
-        } else {
-          req[0] = currentRequest->type;
-          req[1] = currentRequest->addr;
-          req[2] = currentRequest->len;
-        }
+			if (!currentRequest) {
+				req[0] = FXINONE;
+				req[1] = 0;
+				req[2] = 0;
+			} else {
+				req[0] = currentRequest->type;
+				req[1] = currentRequest->addr;
+				req[2] = currentRequest->len;
+			}
 
-        if (copy_to_user (buf, req, 3 * sizeof (unsigned long)) != 0) {
-          printk (KERN_WARNING DEVNAME
-                  ": Could not copy all bytes to user\n");
-        }
+			if (copy_to_user (buf, req, 3 * sizeof (unsigned long)) != 0) {
+				printk (KERN_WARNING DEVNAME
+					": Could not copy all bytes to user\n");
+			}
 
-        if (currentRequest) commandState = DATA;
-      } else {
-        printk (KERN_WARNING DEVNAME ": illegal read size: %d\n", count);
-        return -EIO;
-      }
-      break;
+			if (currentRequest) commandState = DATA;
+		} else {
+			printk (KERN_WARNING DEVNAME ": illegal read size: %d\n", count);
+			return -EIO;
+		}
+		break;
 
-    case DATA: 
-      PDEBUG ("read data %d\n", count);
+	case DATA:
+		PDEBUG ("read data %d\n", count);
 
-      if (count > currentRequest->len) count = currentRequest->len;
+		if (count > currentRequest->len) count = currentRequest->len;
 
-      if (copy_to_user (buf, currentRequest->buf, count) != 0) {
-        printk (KERN_WARNING DEVNAME
-                ": Could not copy all bytes to user\n");
-      }
+		if (copy_to_user (buf, currentRequest->buf, count) != 0) {
+			printk (KERN_WARNING DEVNAME
+				": Could not copy all bytes to user\n");
+		}
 
-      currentRequest->buf += count;
-      currentRequest->len -= count;
+		currentRequest->buf += count;
+		currentRequest->len -= count;
 
-      break;
-  }
+		break;
+	}
 
-  return count;
+	return count;
 }
 
 static ssize_t fxichardev_write (struct file *filp, const char __user *buf,
-                           size_t count, loff_t *f_pos) {
+				 size_t count, loff_t *f_pos) {
 
-  PDEBUG ("write %d\n", count);
+	PDEBUG ("write %d\n", count);
 
-  if (count > currentRequest->len) count = currentRequest->len;
+	if (count > currentRequest->len) count = currentRequest->len;
 
-  if (copy_from_user (currentRequest->buf, buf, count) != 0) {
-    printk (KERN_WARNING DEVNAME
-            ": Could not copy all bytes from user\n");
-  }
+	if (copy_from_user (currentRequest->buf, buf, count) != 0) {
+		printk (KERN_WARNING DEVNAME
+			": Could not copy all bytes from user\n");
+	}
 
-  currentRequest->buf += count;
-  currentRequest->len -= count;
+	currentRequest->buf += count;
+	currentRequest->len -= count;
 
-  return count;
+	return count;
 }
 
 static long fxichardev_ioctl (struct file *file, unsigned int cmd,
-                              unsigned long arg) {
-  switch (cmd) {
+			      unsigned long arg) {
+	switch (cmd) {
 
-    case READY: {
-      unsigned long flags;
+	case READY: {
+		unsigned long flags;
 
-      // lock
-      if (!in_irq()) mutex_lock (&fxichardevmutex);
-      spin_lock_irqsave (&fxichardevlock, flags);
+		// lock
+		if (!in_irq()) mutex_lock (&fxichardevmutex);
+		spin_lock_irqsave (&fxichardevlock, flags);
 
-      printk (KERN_WARNING DEVNAME ": waking process\n");
-      daemonUp = true;
-      if (fxiSleepingTask) {
-        wake_up_process (fxiSleepingTask);
-      }
+		printk (KERN_WARNING DEVNAME ": waking process\n");
+		daemonUp = true;
+		if (fxiSleepingTask) {
+			wake_up_process (fxiSleepingTask);
+		}
 
-      // unlock
-      spin_unlock_irqrestore (&fxichardevlock, flags);
-      if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		// unlock
+		spin_unlock_irqrestore (&fxichardevlock, flags);
+		if (!in_irq()) mutex_unlock (&fxichardevmutex);
 
-      break;
-    }
+		break;
+	}
 
-    case BLOCK_DONE: {
-      unsigned long flags;
+	case BLOCK_DONE: {
+		unsigned long flags;
 
-      PDEBUG ("done\n");
+		PDEBUG ("done\n");
 
-      queueRemove();
+		queueRemove();
 
-      // lock
-      if (!in_irq()) mutex_lock (&fxichardevmutex);
-      spin_lock_irqsave (&fxichardevlock, flags);
+		// lock
+		if (!in_irq()) mutex_lock (&fxichardevmutex);
+		spin_lock_irqsave (&fxichardevlock, flags);
 
-      if (currentRequest->task) {
-        awake = 1;
-        PDEBUG ("Waking %x\n", currentRequest->task);
-        wake_up_process (currentRequest->task);
-      }
+		if (currentRequest->task) {
+			awake = 1;
+			PDEBUG ("Waking %x\n", currentRequest->task);
+			wake_up_process (currentRequest->task);
+		}
 
-      currentRequest = NULL;
+		currentRequest = NULL;
 
-      if (fxiSleepingTask) {
-        awake = 1;
-        PDEBUG ("Waking %x\n", fxiSleepingTask);
-        wake_up_process (fxiSleepingTask);
-        fxiSleepingTask = NULL;
-      }
+		if (fxiSleepingTask) {
+			awake = 1;
+			PDEBUG ("Waking %x\n", fxiSleepingTask);
+			wake_up_process (fxiSleepingTask);
+			fxiSleepingTask = NULL;
+		}
 
-      commandState = COMMAND;
+		commandState = COMMAND;
 
-      // unlock
-      spin_unlock_irqrestore (&fxichardevlock, flags);
-      if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		// unlock
+		spin_unlock_irqrestore (&fxichardevlock, flags);
+		if (!in_irq()) mutex_unlock (&fxichardevmutex);
 
-      break;
-    }
+		break;
+	}
 
-    case IN:
-      inBlock = arg;
-      printk (KERN_WARNING DEVNAME " inblock: %x\n", inBlock);
-      break;
+	case IN:
+		inBlock = arg;
+		printk (KERN_WARNING DEVNAME " inblock: %x\n", inBlock);
+		break;
 
-    case OUT1:
-      outBlock1 = arg;
-      printk (KERN_WARNING DEVNAME " outblock1: %x\n", outBlock1);
-      break;
+	case OUT1:
+		outBlock1 = arg;
+		printk (KERN_WARNING DEVNAME " outblock1: %x\n", outBlock1);
+		break;
 
-    case OUT2:
-      outBlock2 = arg;
-      printk (KERN_WARNING DEVNAME " outblock2: %x\n", outBlock2);
-      break;
+	case OUT2:
+		outBlock2 = arg;
+		printk (KERN_WARNING DEVNAME " outblock2: %x\n", outBlock2);
+		break;
 
-    case PRELOAD:
-      batchValid = false;
-      preload = true;
-      curOutBlock = outBlock1;
-      printk (KERN_WARNING DEVNAME " starting preload mode\n");
-      break;
+	case PRELOAD:
+		batchValid = false;
+		preload = true;
+		curOutBlock = outBlock1;
+		printk (KERN_WARNING DEVNAME " starting preload mode\n");
+		break;
 
-    case BATCHSIZE:
-      batchSize = arg;
-      break;
+	case BATCHSIZE:
+		batchSize = arg;
+		break;
 
-    case IMPACK:
-      impAck = true;
-      break;
+	case IMPACK:
+		impAck = true;
+		break;
 
-    case HASDATA:
-      if (!currentRequest && queueSize()) {
-        unsigned long flags;
+	case HASDATA:
+		if (!currentRequest && queueSize()) {
+			unsigned long flags;
 
-        // lock
-        if (!in_irq()) mutex_lock (&fxichardevmutex);
-        spin_lock_irqsave (&fxichardevlock, flags);
+			// lock
+			if (!in_irq()) mutex_lock (&fxichardevmutex);
+			spin_lock_irqsave (&fxichardevlock, flags);
 
-        // fetch
-        currentRequest = queueFront();
-        commandState = COMMAND;
+			// fetch
+			currentRequest = queueFront();
+			commandState = COMMAND;
 
-        // unlock
-        spin_unlock_irqrestore (&fxichardevlock, flags);
-        if (!in_irq()) mutex_unlock (&fxichardevmutex);
-      }
+			// unlock
+			spin_unlock_irqrestore (&fxichardevlock, flags);
+			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		}
 
-      if (currentRequest) return 1;
-      else return 0;
-      break;
+		if (currentRequest) return 1;
+		else return 0;
+		break;
 
-    case DISABLE_POLL: {
-      unsigned long flags;
+	case DISABLE_POLL: {
+		unsigned long flags;
 
-      // lock
-      if (!in_irq()) mutex_lock (&fxichardevmutex);
-      spin_lock_irqsave (&fxichardevlock, flags);
+		// lock
+		if (!in_irq()) mutex_lock (&fxichardevmutex);
+		spin_lock_irqsave (&fxichardevlock, flags);
 
-      if (currentRequest || queueSize()) {
-        PDEBUG2 ("send SIGIO, start poll\n");
-        polling = true;
-        kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
-      } else {
-        polling = false;
-        PDEBUG2 ("stop poll\n");
-      }
+		if (currentRequest || queueSize()) {
+			PDEBUG2 ("send SIGIO, start poll\n");
+			polling = true;
+			kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
+		} else {
+			polling = false;
+			PDEBUG2 ("stop poll\n");
+		}
 
-      // unlock
-      spin_unlock_irqrestore (&fxichardevlock, flags);
-      if (!in_irq()) mutex_unlock (&fxichardevmutex);
+		// unlock
+		spin_unlock_irqrestore (&fxichardevlock, flags);
+		if (!in_irq()) mutex_unlock (&fxichardevmutex);
 
-      break;
-    }
+		break;
+	}
 
-    default:
-      printk (KERN_WARNING DEVNAME " invalid ioctl %d\n", cmd);
-      return -EIO;
-  }
+	default:
+		printk (KERN_WARNING DEVNAME " invalid ioctl %d\n", cmd);
+		return -EIO;
+	}
 
-  return 0;
+	return 0;
 }
 
 static int fxichardev_fasync (int fd, struct file *filp, int mode) {
@@ -701,7 +701,7 @@ static struct miscdevice md = {
 ///////////////////////////////////////////////////////////////////////////////
 // module
 
-static int __devinit fxichardev_probe(struct platform_device *dev) 
+static int __devinit fxichardev_probe(struct platform_device *dev)
 {
  	printk (KERN_WARNING DEVNAME ": probe\n");
 
@@ -737,17 +737,17 @@ static int __devinit fxichardev_probe(struct platform_device *dev)
 	printk (KERN_WARNING DEVNAME ": init done\n");
 	return 0;
 
-	fail_dev:
+fail_dev:
 	printk (KERN_ERR DEVNAME ": no dev\n");
 	return -ENODEV;
 
-	fail_alloc:
+fail_alloc:
 	// TODO: free
 	printk (KERN_ERR DEVNAME ": no mem\n");
 	return -ENODEV;
 }
 
-static int fxichardev_remove(struct platform_device *dev) 
+static int fxichardev_remove(struct platform_device *dev)
 {
 	printk (KERN_WARNING DEVNAME ": remove\n");
 
