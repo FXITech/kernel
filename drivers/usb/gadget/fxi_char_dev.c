@@ -386,39 +386,6 @@ static int fxichardev_release (struct inode *inode, struct file *filp) {
 	return 0;
 }
 
-static int fxichardev_mmap(struct file *file, struct vm_area_struct *vma)
-{
-	unsigned long start = vma->vm_start;
-	unsigned long size = vma->vm_end - vma->vm_start;
-	dma_addr_t handle;
-	void *mem = dma_alloc_coherent (fxidev, size, &handle, GFP_KERNEL);
-	unsigned long pos = (unsigned long)mem;
-
-        dev_dbg(fxidev, "%s called, allocated: %p %x\n", __func__, mem, handle);
-
-	if (!mem) {
-		dev_err(fxidev, "Failed to allocate memory in %s\n", __func__);
-		return -ENOMEM;
-	}
-
-	while (size > 0) {
-		unsigned long page = vmalloc_to_pfn((void *)pos);
-		if (remap_pfn_range(vma, start, page, PAGE_SIZE, PAGE_SHARED)) {
-			return -EAGAIN;
-		}
-		start += PAGE_SIZE;
-		pos += PAGE_SIZE;
-		if (size > PAGE_SIZE)
-			size -= PAGE_SIZE;
-		else
-			size = 0;
-	}
-
-	vma->vm_flags |= VM_RESERVED | VM_IO;
-
-	return 0;
-}
-
 static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 				size_t count, loff_t *f_pos) {
 	switch (commandState) {
@@ -651,7 +618,6 @@ static struct file_operations fxichardev_fops = {
 	.release = fxichardev_release,
 	.fasync = fxichardev_fasync,
 	.unlocked_ioctl = fxichardev_ioctl,
-	.mmap = fxichardev_mmap,
 };
 
 static struct miscdevice md = {
