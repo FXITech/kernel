@@ -18,16 +18,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define DEBUG 0
-
-#if DEBUG
-#define PDEBUG(fmt, args...) printk( KERN_WARNING DEVNAME ": " fmt, ## args)
-#define PDEBUG2(fmt, args...) printk( KERN_WARNING DEVNAME ": " fmt, ## args)
-#else
-#define PDEBUG(fmt, args...)
-#define PDEBUG2(fmt, args...)
-#endif
-
 #define DEVNAME "fxichardev"
 
 #define FXI_BLOCK_SIZE 512
@@ -136,7 +126,7 @@ static struct FxiRequest *queueInsert (void) {
 
 	if (lastReq < 0) lastReq = firstReq;
 
-	PDEBUG ("insert %d (%d)\n", lastReq, queueSize() + 1);
+	dev_dbg(fxidev, "insert %d (%d)\n", lastReq, queueSize() + 1);
 
 	req = &requestQueue[lastReq];
 	lastReq = (lastReq + 1) % MAX_REQUESTS;
@@ -146,7 +136,7 @@ static struct FxiRequest *queueInsert (void) {
 
 void queueActivate (void) {
 	if (!polling) {
-		PDEBUG2 ("send SIGIO, start poll\n");
+		dev_dbg(fxidev, "send SIGIO, start poll\n");
 		polling = true;
 		kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
 	}
@@ -155,7 +145,7 @@ void queueActivate (void) {
 static struct FxiRequest *queueFront (void) {
 	struct FxiRequest *req;
 
-	PDEBUG ("getting %d\n", firstReq);
+	dev_dbg(fxidev, "getting %d\n", firstReq);
 
 	req = &requestQueue[firstReq];
 
@@ -169,7 +159,7 @@ static void queueRemove (void) {
 	if (!in_irq()) mutex_lock (&fxichardevmutex);
 	spin_lock_irqsave (&fxichardevlock, flags);
 
-	PDEBUG ("remove %d\n", queueSize() - 1);
+	dev_dbg(fxidev, "remove %d\n", queueSize() - 1);
 
 	firstReq = (firstReq + 1) % MAX_REQUESTS;
 
@@ -186,8 +176,9 @@ static void queueRemove (void) {
 ///////////////////////////////////////////////////////////////////////////////
 // handling requests from USB subsystem
 
-static void sleepThread (unsigned long flags) {
-	PDEBUG ("Sleeping %x\n", current);
+static void sleepThread (unsigned long flags)
+{
+	dev_dbg(fxidev, "Sleeping %p\n", current);
 	while (!awake) {
 		fxiSleepingTask = current;
 		set_current_state (TASK_INTERRUPTIBLE);
@@ -205,7 +196,7 @@ static void sleepThread (unsigned long flags) {
 }
 
 static void sleepReq (struct FxiRequest *req, unsigned long flags) {
-	PDEBUG ("Sleeping req %x\n", current);
+	dev_dbg(fxidev, "Sleeping req %p\n", current);
 	while (!awake) {
 		req->task = current;
 		set_current_state (TASK_INTERRUPTIBLE);
@@ -232,12 +223,12 @@ static inline void *nextBlock (int blocks) {
 // from the host
 void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 
-	PDEBUG2 ("fxirequest %ld %ld %d (queue: %d) - %x\n",
-		 type, addr, size, queueSize(), buf);
+	dev_dbg(fxidev, "fxirequest %ld %ld %d (queue: %d) - %p\n",
+		type, addr, size, queueSize(), buf);
 
 	// wait if fusionx daemon is not up yet
 	if (!daemonUp) {
-		printk (KERN_WARNING DEVNAME ": waiting for daemon\n");
+		dev_dbg(fxidev, "Waiting for daemon ...\n");
 
 		while (!daemonUp) {
 			unsigned long flags;
@@ -250,8 +241,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 
 			schedule();
 		}
-
-		printk (KERN_WARNING DEVNAME ": daemon connected\n");
+		dev_dbg(fxidev, "daemon connected\n");
 	}
 
 	if (type == FXIWRITE) {
@@ -267,7 +257,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 			spin_lock_irqsave (&fxichardevlock, flags);
 
 			while (!(req = queueInsert())) {
-				PDEBUG ("Sleeping due to full queue\n");
+				dev_dbg(fxidev, "Sleeping due to full queue\n");
 
 				awake = 0;
 
@@ -328,7 +318,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 				spin_lock_irqsave (&fxichardevlock, flags);
 
 				while (!(req = queueInsert())) {
-					PDEBUG ("Sleeping due to full queue\n");
+					dev_dbg(fxidev, "Sleeping due to full queue\n");
 
 					awake = 0;
 
@@ -371,7 +361,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 			spin_lock_irqsave (&fxichardevlock, flags);
 
 			while (!(req = queueInsert())) {
-				PDEBUG ("Sleeping due to full queue\n");
+				dev_dbg(fxidev, "Sleeping due to full queue\n");
 
 				awake = 0;
 
@@ -416,23 +406,20 @@ static int fxichardev_release (struct inode *inode, struct file *filp) {
 	return 0;
 }
 
-static int fxichardev_mmap(struct file *file, struct vm_area_struct *vma) {
-	printk (KERN_WARNING DEVNAME ": mmap\n");
-
+static int fxichardev_mmap(struct file *file, struct vm_area_struct *vma)
+{
 	unsigned long start = vma->vm_start;
 	unsigned long size = vma->vm_end - vma->vm_start;
 	dma_addr_t handle;
-
 	void *mem = dma_alloc_coherent (fxidev, size, &handle, GFP_KERNEL);
+	unsigned long pos = (unsigned long)mem;
 
-	printk ("Allocated: %x %x\n", mem, handle);
+        dev_dbg(fxidev, "%s called, allocated: %p %x\n", __func__, mem, handle);
 
 	if (!mem) {
-		printk (KERN_WARNING "Can't allocate memory\n");
+		dev_err(fxidev, "Failed to allocate memory in %s\n", __func__);
 		return -ENOMEM;
 	}
-
-	unsigned long pos = (unsigned long)mem;
 
 	while (size > 0) {
 		unsigned long page = vmalloc_to_pfn((void *)pos);
@@ -457,7 +444,7 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 	switch (commandState) {
 
 	case COMMAND:
-		PDEBUG2 ("read command %d\n", count);
+		dev_dbg(fxidev, "read command %d\n", count);
 
 		if (!currentRequest && queueSize()) {
 			unsigned long flags;
@@ -487,27 +474,24 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 				req[2] = currentRequest->len;
 			}
 
-			if (copy_to_user (buf, req, 3 * sizeof (unsigned long)) != 0) {
-				printk (KERN_WARNING DEVNAME
-					": Could not copy all bytes to user\n");
-			}
+			if (copy_to_user (buf, req, 3 * sizeof (unsigned long)) != 0)
+				dev_err(fxidev, "copy_to_user failed in %s\n", __func__);
 
 			if (currentRequest) commandState = DATA;
 		} else {
-			printk (KERN_WARNING DEVNAME ": illegal read size: %d\n", count);
+			dev_err(fxidev, "Illegal read size: %d\n", count);
 			return -EIO;
 		}
 		break;
 
 	case DATA:
-		PDEBUG ("read data %d\n", count);
+		dev_dbg(fxidev, "read data %d\n", count);
 
-		if (count > currentRequest->len) count = currentRequest->len;
+		if (count > currentRequest->len)
+			count = currentRequest->len;
 
-		if (copy_to_user (buf, currentRequest->buf, count) != 0) {
-			printk (KERN_WARNING DEVNAME
-				": Could not copy all bytes to user\n");
-		}
+		if (copy_to_user (buf, currentRequest->buf, count) != 0)
+			dev_err(fxidev, "copy_to_user failed in %s\n", __func__);
 
 		currentRequest->buf += count;
 		currentRequest->len -= count;
@@ -521,14 +505,12 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 static ssize_t fxichardev_write (struct file *filp, const char __user *buf,
 				 size_t count, loff_t *f_pos) {
 
-	PDEBUG ("write %d\n", count);
+	dev_dbg(fxidev, "write %d\n", count);
 
 	if (count > currentRequest->len) count = currentRequest->len;
 
-	if (copy_from_user (currentRequest->buf, buf, count) != 0) {
-		printk (KERN_WARNING DEVNAME
-			": Could not copy all bytes from user\n");
-	}
+	if (copy_from_user (currentRequest->buf, buf, count) != 0)
+		dev_err(fxidev, "copy_from_user failed in %s\n", __func__);
 
 	currentRequest->buf += count;
 	currentRequest->len -= count;
@@ -547,7 +529,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		if (!in_irq()) mutex_lock (&fxichardevmutex);
 		spin_lock_irqsave (&fxichardevlock, flags);
 
-		printk (KERN_WARNING DEVNAME ": waking process\n");
+		dev_dbg(fxidev, "waking up process\n");
 		daemonUp = true;
 		if (fxiSleepingTask) {
 			wake_up_process (fxiSleepingTask);
@@ -563,7 +545,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 	case BLOCK_DONE: {
 		unsigned long flags;
 
-		PDEBUG ("done\n");
+		dev_dbg(fxidev, "BLOCK_DONE\n");
 
 		queueRemove();
 
@@ -573,7 +555,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 
 		if (currentRequest->task) {
 			awake = 1;
-			PDEBUG ("Waking %x\n", currentRequest->task);
+			dev_dbg(fxidev, "Inside BLOCK DONE, Waking task %p\n", currentRequest->task);
 			wake_up_process (currentRequest->task);
 		}
 
@@ -581,7 +563,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 
 		if (fxiSleepingTask) {
 			awake = 1;
-			PDEBUG ("Waking %x\n", fxiSleepingTask);
+			dev_dbg(fxidev, "Inside BLOCK DONE, Waking sleeping task %p\n", fxiSleepingTask);
 			wake_up_process (fxiSleepingTask);
 			fxiSleepingTask = NULL;
 		}
@@ -597,24 +579,24 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 
 	case IN:
 		inBlock = arg;
-		printk (KERN_WARNING DEVNAME " inblock: %x\n", inBlock);
+		dev_dbg(fxidev, "inblock: %x\n", inBlock);
 		break;
 
 	case OUT1:
 		outBlock1 = arg;
-		printk (KERN_WARNING DEVNAME " outblock1: %x\n", outBlock1);
+		dev_dbg(fxidev, "outblock1: %x\n", outBlock1);
 		break;
 
 	case OUT2:
 		outBlock2 = arg;
-		printk (KERN_WARNING DEVNAME " outblock2: %x\n", outBlock2);
+		dev_dbg(fxidev, "outblock2: %x\n", outBlock2);
 		break;
 
 	case PRELOAD:
 		batchValid = false;
 		preload = true;
 		curOutBlock = outBlock1;
-		printk (KERN_WARNING DEVNAME " starting preload mode\n");
+		dev_dbg(fxidev, "starting preload mode\n");
 		break;
 
 	case BATCHSIZE:
@@ -654,12 +636,12 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		spin_lock_irqsave (&fxichardevlock, flags);
 
 		if (currentRequest || queueSize()) {
-			PDEBUG2 ("send SIGIO, start poll\n");
+			dev_dbg(fxidev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
 			polling = true;
 			kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
 		} else {
 			polling = false;
-			PDEBUG2 ("stop poll\n");
+			dev_dbg(fxidev, "Inside DISABLE_POLL, stop poll\n");
 		}
 
 		// unlock
@@ -670,7 +652,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 	}
 
 	default:
-		printk (KERN_WARNING DEVNAME " invalid ioctl %d\n", cmd);
+		dev_err(fxidev, "invalid ioctl code %d\n", cmd);
 		return -EIO;
 	}
 
@@ -703,7 +685,7 @@ static struct miscdevice md = {
 
 static int __devinit fxichardev_probe(struct platform_device *dev)
 {
- 	printk (KERN_WARNING DEVNAME ": probe\n");
+	pr_warn(DEVNAME ": probe\n");
 
 	fxidev = &dev->dev;
 
@@ -730,31 +712,29 @@ static int __devinit fxichardev_probe(struct platform_device *dev)
 
 	{ // init device
 		int retval = misc_register (&md);
-		if (retval) goto fail_dev;
-		else printk (KERN_ALERT DEVNAME ": misc minor: %d\n", md.minor);
+		if (retval)
+			goto fail_dev;
+		else
+			dev_err(fxidev, "misc minor: %d\n", md.minor);
 	}
 
-	printk (KERN_WARNING DEVNAME ": init done\n");
+	dev_dbg(fxidev, "init done");
 	return 0;
 
 fail_dev:
-	printk (KERN_ERR DEVNAME ": no dev\n");
+	pr_err(DEVNAME ": no misc device registration failed\n");
 	return -ENODEV;
 
 fail_alloc:
 	// TODO: free
-	printk (KERN_ERR DEVNAME ": no mem\n");
+	pr_err(DEVNAME ":fail to allocate memory\n");
 	return -ENODEV;
 }
 
 static int fxichardev_remove(struct platform_device *dev)
 {
-	printk (KERN_WARNING DEVNAME ": remove\n");
-
 	misc_deregister (&md);
-
-	printk (KERN_WARNING DEVNAME ": exit done\n");
-
+	dev_dbg(fxidev, "%s called\n", __func__);
 	return 0;
 }
 
