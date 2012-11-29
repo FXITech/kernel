@@ -88,7 +88,6 @@ static int curOutBlock; // set to either outBlock1 or outBlock2
 // queue management
 
 static DEFINE_MUTEX(fxichardevmutex);
-static spinlock_t fxichardevlock;
 
 static int queueSize (void) {
 	if (lastReq < 0) return 0;
@@ -132,13 +131,11 @@ static struct FxiRequest *queueFront (void) {
 	return req;
 }
 
-static void queueRemove (void) {
+static void queueRemove (void)
+{
 	unsigned long flags;
 
-	// lock
-	if (!in_irq()) mutex_lock (&fxichardevmutex);
-	spin_lock_irqsave (&fxichardevlock, flags);
-
+	mutex_lock (&fxichardevmutex);
 	dev_dbg(fxidev, "remove %d\n", queueSize() - 1);
 
 	firstReq = (firstReq + 1) % MAX_REQUESTS;
@@ -147,10 +144,7 @@ static void queueRemove (void) {
 		// queue empty
 		lastReq = -1;
 	}
-
-	// unlock
-	spin_unlock_irqrestore (&fxichardevlock, flags);
-	if (!in_irq()) mutex_unlock (&fxichardevmutex);
+	mutex_unlock (&fxichardevmutex);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -163,15 +157,9 @@ static void sleepThread (unsigned long flags)
 		fxiSleepingTask = current;
 		set_current_state (TASK_INTERRUPTIBLE);
 
-		// unlock
-		spin_unlock_irqrestore (&fxichardevlock, flags);
-		if (!in_irq()) mutex_unlock (&fxichardevmutex);
-
+		mutex_unlock (&fxichardevmutex);
 		schedule();
-
-		// lock
-		if (!in_irq()) mutex_lock (&fxichardevmutex);
-		spin_lock_irqsave (&fxichardevlock, flags);
+		mutex_lock (&fxichardevmutex);
 	}
 }
 
@@ -181,15 +169,9 @@ static void sleepReq (struct FxiRequest *req, unsigned long flags) {
 		req->task = current;
 		set_current_state (TASK_INTERRUPTIBLE);
 
-		// unlock
-		spin_unlock_irqrestore (&fxichardevlock, flags);
-		if (!in_irq()) mutex_unlock (&fxichardevmutex);
-
+		mutex_unlock (&fxichardevmutex);
 		schedule();
-
-		// lock
-		if (!in_irq()) mutex_lock (&fxichardevmutex);
-		spin_lock_irqsave (&fxichardevlock, flags);
+		mutex_lock (&fxichardevmutex);
 	}
 }
 
@@ -232,9 +214,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 
 			if (bytes > MAX_BUF_SIZE) bytes = MAX_BUF_SIZE;
 
-			// lock
-			if (!in_irq()) mutex_lock (&fxichardevmutex);
-			spin_lock_irqsave (&fxichardevlock, flags);
+			mutex_lock (&fxichardevmutex);
 
 			while (!(req = queueInsert())) {
 				dev_dbg(fxidev, "Sleeping due to full queue\n");
@@ -272,10 +252,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 			addr += bytes / FXI_BLOCK_SIZE;
 
 			queueActivate();
-
-			// unlock
-			spin_unlock_irqrestore (&fxichardevlock, flags);
-			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+			mutex_unlock (&fxichardevmutex);
 		}
 
 	} else { // FXIREAD
@@ -293,10 +270,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 				unsigned long flags;
 				struct FxiRequest *req;
 
-				// lock
-				if (!in_irq()) mutex_lock (&fxichardevmutex);
-				spin_lock_irqsave (&fxichardevlock, flags);
-
+				mutex_lock (&fxichardevmutex);
 				while (!(req = queueInsert())) {
 					dev_dbg(fxidev, "Sleeping due to full queue\n");
 
@@ -316,10 +290,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 				queueActivate();
 
 				sleepReq (req, flags);
-
-				// unlock
-				spin_unlock_irqrestore (&fxichardevlock, flags);
-				if (!in_irq()) mutex_unlock (&fxichardevmutex);
+				mutex_unlock (&fxichardevmutex);
 
 				batchValid = true;
 			}
@@ -336,10 +307,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 			unsigned long flags;
 			struct FxiRequest *req;
 
-			// lock
-			if (!in_irq()) mutex_lock (&fxichardevmutex);
-			spin_lock_irqsave (&fxichardevlock, flags);
-
+			mutex_lock (&fxichardevmutex);
 			while (!(req = queueInsert())) {
 				dev_dbg(fxidev, "Sleeping due to full queue\n");
 
@@ -358,10 +326,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size) {
 			queueActivate();
 
 			sleepReq (req, flags);
-
-			// unlock
-			spin_unlock_irqrestore (&fxichardevlock, flags);
-			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+			mutex_unlock (&fxichardevmutex);
 		}
 	}
 }
@@ -396,16 +361,11 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 		if (!currentRequest && queueSize()) {
 			unsigned long flags;
 
-			// lock
-			if (!in_irq()) mutex_lock (&fxichardevmutex);
-			spin_lock_irqsave (&fxichardevlock, flags);
+			mutex_lock (&fxichardevmutex);
 
 			// fetch
 			currentRequest = queueFront();
-
-			// unlock
-			spin_unlock_irqrestore (&fxichardevlock, flags);
-			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+			mutex_unlock (&fxichardevmutex);
 		}
 
 		if (count == 3 * sizeof (unsigned long)) {
@@ -472,20 +432,12 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 	case FXI_CHAR_DEV_IOCTL_READY: {
 		unsigned long flags;
 
-		// lock
-		if (!in_irq()) mutex_lock (&fxichardevmutex);
-		spin_lock_irqsave (&fxichardevlock, flags);
-
+		mutex_lock (&fxichardevmutex);
 		dev_dbg(fxidev, "waking up process\n");
 		daemonUp = true;
-		if (fxiSleepingTask) {
+		if (fxiSleepingTask)
 			wake_up_process (fxiSleepingTask);
-		}
-
-		// unlock
-		spin_unlock_irqrestore (&fxichardevlock, flags);
-		if (!in_irq()) mutex_unlock (&fxichardevmutex);
-
+		mutex_unlock (&fxichardevmutex);
 		break;
 	}
 
@@ -495,10 +447,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		dev_dbg(fxidev, "BLOCK_DONE\n");
 
 		queueRemove();
-
-		// lock
-		if (!in_irq()) mutex_lock (&fxichardevmutex);
-		spin_lock_irqsave (&fxichardevlock, flags);
+		mutex_lock (&fxichardevmutex);
 
 		if (currentRequest->task) {
 			awake = 1;
@@ -516,11 +465,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		}
 
 		commandState = COMMAND;
-
-		// unlock
-		spin_unlock_irqrestore (&fxichardevlock, flags);
-		if (!in_irq()) mutex_unlock (&fxichardevmutex);
-
+		mutex_unlock (&fxichardevmutex);
 		break;
 	}
 
@@ -558,17 +503,13 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		if (!currentRequest && queueSize()) {
 			unsigned long flags;
 
-			// lock
-			if (!in_irq()) mutex_lock (&fxichardevmutex);
-			spin_lock_irqsave (&fxichardevlock, flags);
+			mutex_lock (&fxichardevmutex);
 
 			// fetch
 			currentRequest = queueFront();
 			commandState = COMMAND;
 
-			// unlock
-			spin_unlock_irqrestore (&fxichardevlock, flags);
-			if (!in_irq()) mutex_unlock (&fxichardevmutex);
+			mutex_unlock (&fxichardevmutex);
 		}
 
 		if (currentRequest) return 1;
@@ -578,10 +519,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 	case FXI_CHAR_DEV_IOCTL_DISABLE_POLL: {
 		unsigned long flags;
 
-		// lock
-		if (!in_irq()) mutex_lock (&fxichardevmutex);
-		spin_lock_irqsave (&fxichardevlock, flags);
-
+		mutex_lock (&fxichardevmutex);
 		if (currentRequest || queueSize()) {
 			dev_dbg(fxidev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
 			polling = true;
@@ -591,10 +529,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 			dev_dbg(fxidev, "Inside DISABLE_POLL, stop poll\n");
 		}
 
-		// unlock
-		spin_unlock_irqrestore (&fxichardevlock, flags);
-		if (!in_irq()) mutex_unlock (&fxichardevmutex);
-
+		mutex_unlock (&fxichardevmutex);
 		break;
 	}
 
