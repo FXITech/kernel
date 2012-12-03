@@ -21,6 +21,8 @@
 #include "i2s.h"
 #include "ccandy.h"
 
+#define MAX_MSGS_IN_CAPTURE_QUEUE 20
+
 static snd_pcm_uframes_t
 ccandy_play_pointer(struct snd_pcm_substream *substream)
 {
@@ -66,7 +68,10 @@ ccandy_play_pointer(struct snd_pcm_substream *substream)
 		/* Divide pcm frame into 'step' subpackets.. */
 		for(i = 0; i < steps; i++) {
 			struct pcm_msg *msg;
+			struct list_head *dummy;
 			u32 end, pos;
+			size_t count = 0;
+
 			msg = kmalloc(sizeof(struct pcm_msg), GFP_KERNEL);
 			msg->size = ccdev->pcm_period_size;
 			msg->data = kmalloc(msg->size, GFP_KERNEL);
@@ -80,7 +85,14 @@ ccandy_play_pointer(struct snd_pcm_substream *substream)
 				substream->runtime->dma_area + pos,
 				msg->size);
 			spin_lock_irqsave(&ccdev->lock, flags);
-			list_add_tail(&msg->qnode, &ccdev->capture_q);
+			list_for_each(dummy, &ccdev->capture_q)
+				count++;
+			if (count < MAX_MSGS_IN_CAPTURE_QUEUE)
+				list_add_tail(&msg->qnode, &ccdev->capture_q);
+			else
+				dev_err(&ccdev->dev_ccandy_audio_plat->dev,
+					"The capture queue is full\n"
+					"Discarding pcm buffers\n");
 			spin_unlock_irqrestore(&ccdev->lock, flags);
 		}
 	}
