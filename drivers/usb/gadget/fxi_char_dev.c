@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
+#include <linux/completion.h>
 
 #include <linux/time.h>
 #include "fxi_char_dev.h"
@@ -41,7 +42,6 @@ enum CommandStates {
 
 /* represents one request in the request queue */
 struct FxiRequest {
-	struct task_struct *task;
 	unsigned long type;
 	unsigned long addr;
 	signed long len;
@@ -53,8 +53,6 @@ static struct device *fxidev;
 
 static struct fasync_struct *fxiAsyncQueue;
 static atomic_t fxichardev_available = ATOMIC_INIT(1);
-
-static struct task_struct *fxiSleepingTask; /* task that is sleeping if !awake */
 
 static int commandState;
 
@@ -75,8 +73,10 @@ static int batchBlockPointer; /* current batch block pointer */
 /* various flags */
 static int preload; /* flag: preload mode active */
 static int impAck; /* flag: ACK is done in driver (not user space) */
-static volatile int awake; /* flag: is awake and ready to accept reads/writes */
 static volatile int daemonUp = false; /* flags: user space daemon has started */
+static struct completion daemon_running;
+static struct completion ready_for_new_requests;
+
 static int polling;
 
 /* other configuration vars */
@@ -144,39 +144,24 @@ static void queueRemove (void)
 	mutex_unlock (&fxichardevmutex);
 }
 
-/* handling requests from USB subsystem */
-
-static void sleepThread (unsigned long flags)
-{
-	dev_dbg(fxidev, "Sleeping %p\n", current);
-	while (!awake) {
-		fxiSleepingTask = current;
-		set_current_state (TASK_INTERRUPTIBLE);
-
-		mutex_unlock (&fxichardevmutex);
-		schedule();
-		mutex_lock (&fxichardevmutex);
-	}
-}
-
-static void sleepReq (struct FxiRequest *req, unsigned long flags)
-{
-	dev_dbg(fxidev, "Sleeping req %p\n", current);
-	while (!awake) {
-		req->task = current;
-		set_current_state (TASK_INTERRUPTIBLE);
-
-		mutex_unlock (&fxichardevmutex);
-		schedule();
-		mutex_lock (&fxichardevmutex);
-	}
-}
-
 static inline void *nextBlock (int blocks)
 {
 	void *ptr = batch[batchBlockPointer % batchSize];
 	batchBlockPointer += blocks;
 	return ptr;
+}
+
+static struct FxiRequest* get_request_wait(struct FxiRequest *req)
+{
+	for (;;) {
+		mutex_lock(&fxichardevmutex);
+		req = queueInsert();
+		mutex_unlock(&fxichardevmutex);
+		if (req)
+			return req;
+		wait_for_completion(&ready_for_new_requests);
+		INIT_COMPLETION(ready_for_new_requests);
+	}
 }
 
 /* called by gadget driver whenever there is a request (read of write)
@@ -188,54 +173,37 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 
 	/* wait if fusionx daemon is not up yet */
 	if (!daemonUp) {
-		dev_dbg(fxidev, "Waiting for daemon ...\n");
-
-		while (!daemonUp) {
-			unsigned long flags;
-			local_irq_save (flags);
-			fxiSleepingTask = current;
-			set_current_state (TASK_INTERRUPTIBLE);
-			local_irq_restore (flags);
-			schedule();
-		}
+		wait_for_completion(&daemon_running);
+		INIT_COMPLETION(daemon_running);
 		dev_dbg(fxidev, "daemon connected\n");
 	}
 
 	if (type == FXIWRITE) {
 		while (size) {
-			unsigned long flags;
 			struct FxiRequest *req;
 			int bytes = size;
+			unsigned char *block = buf;
 
 			if (bytes > MAX_BUF_SIZE)
 				bytes = MAX_BUF_SIZE;
-			mutex_lock (&fxichardevmutex);
-			while (!(req = queueInsert())) {
-				dev_dbg(fxidev, "Sleeping due to full queue\n");
-				awake = 0;
-				sleepThread (flags);
-			}
 
-			{
-				unsigned char *block = buf;
-				if ((addr >= inBlock) && (block[0] & ACK)) {
-					/* ACK, get new batch */
-					batchValid = false;
-				}
-				if ((addr >= inBlock) && (block[0] == NACK)) {
-					/* NACK, get a previous batch */
-					batchValid = false;
-				}
-			}
+			req = get_request_wait(req);
 
+			 /* ACK, get new batch */
+			if ((addr >= inBlock) && (block[0] & ACK))
+				batchValid = false;
+
+			 /* NACK, get a previous batch */
+			if ((addr >= inBlock) && (block[0] == NACK))
+				batchValid = false;
+
+			mutex_lock(&fxichardevmutex);
 			/* build request */
-			req->task = NULL;
 			req->addr = addr;
 			req->type = type;
 			req->len = bytes;
 			req->buf = req->writeBuf;
-
-			memcpy (req->writeBuf, buf, bytes);
+			memcpy(req->writeBuf, buf, bytes);
 
 			/* update variables for next request
 			   (if this is longer than a single request) */
@@ -244,7 +212,9 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			addr += bytes / FXI_BLOCK_SIZE;
 
 			queueActivate();
-			mutex_unlock (&fxichardevmutex);
+			mutex_unlock(&fxichardevmutex);
+			wait_for_completion(&ready_for_new_requests);
+			INIT_COMPLETION(ready_for_new_requests);
 		}
 
 	} else { /* FXIREAD */
@@ -257,33 +227,22 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			}
 
 			if (!batchValid) {
-				unsigned long flags;
 				struct FxiRequest *req;
-
-				mutex_lock (&fxichardevmutex);
-				while (!(req = queueInsert())) {
-					dev_dbg(fxidev, "Sleeping due to full queue\n");
-					awake = 0;
-					sleepThread (flags);
-				}
-
-				req->task = NULL;
+				req = get_request_wait(req);
+				mutex_lock(&fxichardevmutex);
 				req->addr = addr;
 				req->type = type;
 				req->buf = batch;
 				req->len = FXI_BLOCK_SIZE * FXI_MAX_BLOCKS;
-
 				batchBlockPointer = 0;
-				awake = 0;
 				queueActivate();
-
-				sleepReq (req, flags);
 				mutex_unlock (&fxichardevmutex);
-
+				wait_for_completion(&ready_for_new_requests);
+				INIT_COMPLETION(ready_for_new_requests);
 				batchValid = true;
 			}
 
-			memcpy (buf, nextBlock (size / FXI_BLOCK_SIZE), size);
+			memcpy(buf, nextBlock(size / FXI_BLOCK_SIZE), size);
 
 			if (*(uint32_t*)buf == 0) {
 				/* empty batch, need to fetch new batch next time */
@@ -291,27 +250,17 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 				batchValid = false;
 			}
 		} else {
-			unsigned long flags;
 			struct FxiRequest *req;
-
+			req = get_request_wait(req);
 			mutex_lock (&fxichardevmutex);
-			while (!(req = queueInsert())) {
-				dev_dbg(fxidev, "Sleeping due to full queue\n");
-				awake = 0;
-				sleepThread (flags);
-			}
-
-			req->task = NULL;
 			req->addr = addr;
 			req->type = type;
 			req->buf = buf;
 			req->len = size;
-
-			awake = 0;
 			queueActivate();
-
-			sleepReq (req, flags);
 			mutex_unlock (&fxichardevmutex);
+			wait_for_completion(&ready_for_new_requests);
+			INIT_COMPLETION(ready_for_new_requests);
 		}
 	}
 }
@@ -409,35 +358,18 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 {
 	switch (cmd) {
 	case FXI_CHAR_DEV_IOCTL_READY: {
-		mutex_lock (&fxichardevmutex);
 		dev_dbg(fxidev, "waking up process\n");
 		daemonUp = true;
-		if (fxiSleepingTask)
-			wake_up_process (fxiSleepingTask);
-		mutex_unlock (&fxichardevmutex);
+		complete(&daemon_running);
 		break;
 	}
 
 	case FXI_CHAR_DEV_IOCTL_BLOCK_DONE: {
 		dev_dbg(fxidev, "BLOCK_DONE\n");
 		queueRemove();
+		complete_all(&ready_for_new_requests);
 		mutex_lock (&fxichardevmutex);
-
-		if (currentRequest->task) {
-			awake = 1;
-			dev_dbg(fxidev, "Inside BLOCK DONE, Waking task %p\n", currentRequest->task);
-			wake_up_process (currentRequest->task);
-		}
-
 		currentRequest = NULL;
-
-		if (fxiSleepingTask) {
-			awake = 1;
-			dev_dbg(fxidev, "Inside BLOCK DONE, Waking sleeping task %p\n", fxiSleepingTask);
-			wake_up_process (fxiSleepingTask);
-			fxiSleepingTask = NULL;
-		}
-
 		commandState = COMMAND;
 		mutex_unlock (&fxichardevmutex);
 		break;
@@ -536,15 +468,16 @@ static int __devinit fxichardev_probe(struct platform_device *dev)
 	fxidev = &dev->dev;
 	impAck = false;
 	currentRequest = NULL;
-	fxiSleepingTask = NULL;
 	fxiAsyncQueue = NULL;
 	batchValid = false;
 	preload = false;
-	awake = 1;
 	daemonUp = false;
 	polling = false;
 	firstReq = 0;
 	lastReq = -1;
+
+	init_completion(&daemon_running);
+	init_completion(&ready_for_new_requests);
 
 	for (i = 0; i < MAX_REQUESTS; i++) {
 		requestQueue[i].writeBuf = kmalloc (MAX_BUF_SIZE, GFP_KERNEL);
