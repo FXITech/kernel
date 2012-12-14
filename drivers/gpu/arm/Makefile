@@ -1,2 +1,2 @@
-obj-$(CONFIG_MALI400MP)	+=mali_r3p0/
+obj-$(CONFIG_MALI400MP)	+=mali/
 obj-$(CONFIG_UMP)	+=ump/

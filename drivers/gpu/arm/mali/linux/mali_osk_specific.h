@@ -22,7 +22,7 @@ extern "C"
 {
 #endif
 
-#define MALI_STATIC_INLINE     static inline
+#define MALI_STATIC_INLINE static inline
 #define MALI_NON_STATIC_INLINE inline
 
 #ifdef __cplusplus
@@ -39,7 +39,7 @@ typedef enum
     ACTIVITY_FP0,
     ACTIVITY_FP1,
     ACTIVITY_FP2,
-    ACTIVITY_FP3,
+    ACTIVITY_FP3, 
 
     /* L2 cache counters */
     COUNTER_L2_C0,
@@ -59,7 +59,7 @@ typedef enum
     COUNTER_FP3_C0,
     COUNTER_FP3_C1,
 
-    /*
+    /* 
      * If more hardware counters are added, the _mali_osk_hw_counter_table
      * below should also be updated.
      */
