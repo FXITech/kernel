@@ -1,75 +1,78 @@
-config MALI400MP
+config MALI400
         bool "Enable MALI integration"
+	depends on ARM
+	select DMA_SHARED_BUFFER
         default n
         ---help---
                 This enables MALI 3D graphics driver. Required to use hardware accelerated OpenGL ES 2.0 and 1.1.
 
 config USING_MMU
         bool "Using MMU"
-        depends on MALI400MP
+        depends on MALI400
         default y
         ---help--- 
                 This enables MMU for Mali. Required hardware support for MMU.
 
-config USING_UMP
-        bool "Using UMP"
-        depends on MALI400MP && UMP
+config MALI400_UMP
+        bool "Enable UMP support"
+        depends on MALI400
         default y
         ---help---
-                Using UMP for Mali memory.
+                This enables support for the UMP memory sharing API in the Mali driver.
 
 config USING_OS_MEMORY
         bool "Using OS memory"
-        depends on MALI400MP
+        depends on MALI400
         default y
         ---help---
                 This enables for Mali to use OS memory.
 
 config USING_PMM
         bool "Enable Power Management"
-        depends on MALI400MP
+        depends on MALI400
         default n
         ---help---
                 This enables for Mali Power Management.
 
-config USING_GPU_UTILIZATION
-	bool "GPU utilization"
-        depends on MALI400MP
+config MALI400_INTERNAL_PROFILING
+	bool "Enable internal Mali profiling API"
+        depends on MALI400
         default n
         ---help---
-                This enables GPU utilization information.
+                This enables the internal legacy Mali profiling API.
 
 config USING_MALI_RUN_TIME_PM
         bool "Using Run time Power Management"
-        depends on MALI400MP
+        depends on MALI400
         default n
         ---help---
                 This enables Mali working with run time power management.
 
 config USING_MALI_PMM_TESTSUITE
         bool "Power Management Test Suite"
-        depends on MALI400MP
+        depends on MALI400
         default n
         ---help---
                 This enables Power management Test Suite.
 
-config USING_PROFILING
-        bool "Enable Profiling"
-        depends on MALI400MP
+config MALI400_PROFILING
+        bool "Enable Mali profiling"
+        depends on MALI400
+	select TRACEPOINTS
         default n
         ---help---
-                This support Profiling on Mali.
+                This enables gator profiling of Mali GPU events.
 
-config DEBUG_BUILD
+config MALI400_DEBUG
         bool "Enables debug messages"
-        depends on MALI400MP
+        depends on MALI400
         default n
         ---help---
                 This enables Mali driver debug messages.
 
 config MALI_MEM_SIZE
 	int "Mali memory size"
-	depends on MALI400MP
+	depends on MALI400
 	default "64"
 	---help---
 		This value is memory size of Mali GPU(unit is MByte).

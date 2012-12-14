@@ -1,0 +1,5 @@
+config UMPLOCK
+        bool "Enable Mali UMPLOCK"
+        default y
+	---help---
+		This enables UMPLOCK driver

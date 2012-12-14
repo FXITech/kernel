@@ -5,6 +5,7 @@ header-y += drm_sarea.h
 header-y += exynos_drm.h
 header-y += i810_drm.h
 header-y += i915_drm.h
+header-y += mali_drm.h
 header-y += mga_drm.h
 header-y += nouveau_drm.h
 header-y += r128_drm.h

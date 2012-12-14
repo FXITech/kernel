@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 ARM Limited. All rights reserved.
+ * Copyright (C) 2011-2012 ARM Limited. All rights reserved.
  * 
  * This program is free software and is provided to you under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation, and any use by you of this program is subject to the terms of such GNU licence.
@@ -16,12 +16,12 @@ extern "C"
 {
 #endif
 
+#include <linux/device.h>
+
 #define MALI_PROC_DIR "driver/mali"
 
-int mali_sysfs_register(struct mali_dev *mali_class, dev_t dev, const char *mali_dev_name);
-
-int mali_sysfs_unregister(struct mali_dev *mali_class, dev_t dev, const char *mali_dev_name);
-
+int mali_sysfs_register(const char *mali_dev_name);
+int mali_sysfs_unregister(void);
 
 #ifdef __cplusplus
 }

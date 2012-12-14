@@ -12,7 +12,7 @@ ifeq ($(CONFIG_USING_OS_MEMORY),y)
 USING_MEMORY_TYPE=1
 endif
 
-UMP_FILE_PREFIX = 
+UMP_FILE_PREFIX := drivers/gpu/arm/ump/
 UDD_FILE_PREFIX := drivers/gpu/arm/ump/
 
 # For each arch check: CROSS_COMPILE , KDIR , CFLAGS += -DARCH
@@ -40,24 +40,25 @@ endif
 
 obj-$(CONFIG_UMP)       += ump.o
 
-ump-y:=	$(UMP_FILE_PREFIX)common/ump_kernel_common.o \
-	$(UMP_FILE_PREFIX)common/ump_kernel_descriptor_mapping.o \
-	$(UMP_FILE_PREFIX)common/ump_kernel_api.o \
-	$(UMP_FILE_PREFIX)common/ump_kernel_ref_drv.o \
-	$(UMP_FILE_PREFIX)linux/ump_kernel_linux.o \
-	$(UMP_FILE_PREFIX)linux/ump_kernel_memory_backend_os.o \
-	$(UMP_FILE_PREFIX)linux/ump_kernel_memory_backend_dedicated.o \
-	$(UMP_FILE_PREFIX)linux/ump_memory_backend.o \
-	$(UMP_FILE_PREFIX)linux/ump_ukk_wrappers.o \
-	$(UMP_FILE_PREFIX)linux/ump_ukk_ref_wrappers.o \
-	$(UMP_FILE_PREFIX)linux/ump_osk_atomics.o \
-	$(UMP_FILE_PREFIX)linux/ump_osk_low_level_mem.o \
-	$(UMP_FILE_PREFIX)linux/ump_osk_misc.o \
-	$(UMP_FILE_PREFIX)../mali/linux/mali_osk_atomics.o \
-	$(UMP_FILE_PREFIX)../mali/linux/mali_osk_locks.o \
-	$(UMP_FILE_PREFIX)../mali/linux/mali_osk_memory.o \
-	$(UMP_FILE_PREFIX)../mali/linux/mali_osk_math.o \
-	$(UMP_FILE_PREFIX)../mali/linux/mali_osk_misc.o
+ump-y:=	common/ump_kernel_common.o \
+	common/ump_kernel_descriptor_mapping.o \
+	common/ump_kernel_api.o \
+	common/ump_kernel_ref_drv.o \
+	linux/ump_kernel_linux.o \
+	linux/ump_kernel_memory_backend_os.o \
+	linux/ump_kernel_memory_backend_dedicated.o \
+	linux/ump_memory_backend.o \
+	linux/ump_ukk_wrappers.o \
+	linux/ump_ukk_ref_wrappers.o \
+	linux/ump_osk_atomics.o \
+	linux/ump_osk_low_level_mem.o \
+	linux/ump_osk_misc.o \
+	../mali/linux/mali_osk_atomics.o \
+	../mali/linux/mali_osk_locks.o \
+	../mali/linux/mali_osk_memory.o \
+	../mali/linux/mali_osk_math.o \
+	../mali/linux/mali_osk_misc.o
+
 
 # Get subversion revision number, fall back to 0000 if no svn info is available
 SVN_REV:=$(shell ((svnversion | grep -qvE '(exported|Unversioned)' && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')

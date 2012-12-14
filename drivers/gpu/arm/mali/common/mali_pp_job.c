@@ -14,62 +14,78 @@
 #include "mali_kernel_common.h"
 #include "mali_uk_types.h"
 
-struct mali_pp_job *mali_pp_job_create(struct mali_session_data *session, _mali_uk_pp_start_job_s *args, u32 id)
+static u32 pp_counter_src0 = MALI_HW_CORE_NO_COUNTER;      /**< Performance counter 0, MALI_HW_CORE_NO_COUNTER for disabled */
+static u32 pp_counter_src1 = MALI_HW_CORE_NO_COUNTER;      /**< Performance counter 1, MALI_HW_CORE_NO_COUNTER for disabled */
+
+struct mali_pp_job *mali_pp_job_create(struct mali_session_data *session, _mali_uk_pp_start_job_s *uargs, u32 id)
 {
 	struct mali_pp_job *job;
-
-	if (args->num_cores > _MALI_PP_MAX_SUB_JOBS)
-	{
-		MALI_PRINT_ERROR(("Mali PP job: Too many sub jobs specified in job object\n"));
-		return NULL;
-	}
+	u32 perf_counter_flag;
 
 	job = _mali_osk_malloc(sizeof(struct mali_pp_job));
 	if (NULL != job)
 	{
 		u32 i;
+
+		if (0 != _mali_osk_copy_from_user(&job->uargs, uargs, sizeof(_mali_uk_pp_start_job_s)))
+		{
+			_mali_osk_free(job);
+			return NULL;
+		}
+
+		if (job->uargs.num_cores > _MALI_PP_MAX_SUB_JOBS)
+		{
+			MALI_PRINT_ERROR(("Mali PP job: Too many sub jobs specified in job object\n"));
+			_mali_osk_free(job);
+			return NULL;
+		}
+
+		if (!mali_pp_job_use_no_notification(job))
+		{
+			job->finished_notification = _mali_osk_notification_create(_MALI_NOTIFICATION_PP_FINISHED, sizeof(_mali_uk_pp_job_finished_s));
+			if (NULL == job->finished_notification)
+			{
+				_mali_osk_free(job);
+				return NULL;
+			}
+		}
+		else
+		{
+			job->finished_notification = NULL;
+		}
+
+		perf_counter_flag = mali_pp_job_get_perf_counter_flag(job);
+
+		/* case when no counters came from user space
+		 * so pass the debugfs / DS-5 provided global ones to the job object */
+		if (!((perf_counter_flag & _MALI_PERFORMANCE_COUNTER_FLAG_SRC0_ENABLE) ||
+				(perf_counter_flag & _MALI_PERFORMANCE_COUNTER_FLAG_SRC1_ENABLE)))
+		{
+			mali_pp_job_set_perf_counter_src0(job, mali_pp_job_get_pp_counter_src0());
+			mali_pp_job_set_perf_counter_src1(job, mali_pp_job_get_pp_counter_src1());
+		}
+
 		_mali_osk_list_init(&job->list);
 		job->session = session;
+		_mali_osk_list_init(&job->session_list);
 		job->id = id;
-		job->user_id = args->user_job_ptr;
-		_mali_osk_memcpy(job->frame_registers, args->frame_registers, sizeof(job->frame_registers));
-		_mali_osk_memcpy(job->frame_registers_addr_frame, args->frame_registers_addr_frame, sizeof(job->frame_registers_addr_frame));
-		_mali_osk_memcpy(job->frame_registers_addr_stack, args->frame_registers_addr_stack, sizeof(job->frame_registers_addr_stack));
 
-		/* Only copy write back registers for the units that are enabled */
-		job->wb0_registers[0] = 0;
-		job->wb1_registers[0] = 0;
-		job->wb2_registers[0] = 0;
-		if (args->wb0_registers[0]) /* M200_WB0_REG_SOURCE_SELECT register */
-		{
-			_mali_osk_memcpy(job->wb0_registers, args->wb0_registers, sizeof(job->wb0_registers));
-		}
-		if (args->wb1_registers[0]) /* M200_WB1_REG_SOURCE_SELECT register */
-		{
-			_mali_osk_memcpy(job->wb1_registers, args->wb1_registers, sizeof(job->wb1_registers));
-		}
-		if (args->wb2_registers[0]) /* M200_WB2_REG_SOURCE_SELECT register */
-		{
-			_mali_osk_memcpy(job->wb2_registers, args->wb2_registers, sizeof(job->wb2_registers));
-		}
-
-		job->perf_counter_flag = args->perf_counter_flag;
-		job->perf_counter_src0 = args->perf_counter_src0;
-		job->perf_counter_src1 = args->perf_counter_src1;
-		for (i = 0; i < args->num_cores; i++)
+		for (i = 0; i < job->uargs.num_cores; i++)
 		{
 			job->perf_counter_value0[i] = 0;
 			job->perf_counter_value1[i] = 0;
 		}
-		job->sub_job_count = args->num_cores;
+		job->sub_jobs_num = job->uargs.num_cores ? job->uargs.num_cores : 1;
 		job->sub_jobs_started = 0;
 		job->sub_jobs_completed = 0;
 		job->sub_job_errors = 0;
-
 		job->pid = _mali_osk_get_pid();
 		job->tid = _mali_osk_get_tid();
-		job->frame_builder_id = args->frame_builder_id;
-		job->flush_id = args->flush_id;
+#if defined(CONFIG_SYNC)
+		job->sync_point = NULL;
+		job->pre_fence = NULL;
+		job->sync_work = NULL;
+#endif
 
 		return job;
 	}
@@ -79,14 +95,37 @@ struct mali_pp_job *mali_pp_job_create(struct mali_session_data *session, _mali_
 
 void mali_pp_job_delete(struct mali_pp_job *job)
 {
+#ifdef CONFIG_SYNC
+	if (NULL != job->pre_fence) sync_fence_put(job->pre_fence);
+	if (NULL != job->sync_point) sync_fence_put(job->sync_point->fence);
+#endif
+	if (NULL != job->finished_notification)
+	{
+		_mali_osk_notification_delete(job->finished_notification);
+	}
 	_mali_osk_free(job);
 }
 
-_mali_osk_errcode_t mali_pp_job_check(struct mali_pp_job *job)
+u32 mali_pp_job_get_pp_counter_src0(void)
 {
-	if ((0 == job->frame_registers[0]) || (0 == job->frame_registers[1]))
-	{
-		return _MALI_OSK_ERR_FAULT;
-	}
-	return _MALI_OSK_ERR_OK;
+	return pp_counter_src0;
+}
+
+mali_bool mali_pp_job_set_pp_counter_src0(u32 counter)
+{
+	pp_counter_src0 = counter;
+
+	return MALI_TRUE;
+}
+
+u32 mali_pp_job_get_pp_counter_src1(void)
+{
+	return pp_counter_src1;
+}
+
+mali_bool mali_pp_job_set_pp_counter_src1(u32 counter)
+{
+	pp_counter_src1 = counter;
+
+	return MALI_TRUE;
 }
