@@ -16,6 +16,7 @@
 #include "mali_kernel_common.h"
 #include "mali_session.h"
 #include "mali_ukk_wrappers.h"
+#include "mali_sync.h"
 
 int get_api_version_wrapper(struct mali_session_data *session_data, _mali_uk_get_api_version_s __user *uargs)
 {
@@ -33,64 +34,6 @@ int get_api_version_wrapper(struct mali_session_data *session_data, _mali_uk_get
     if (0 != put_user(kargs.version, &uargs->version)) return -EFAULT;
     if (0 != put_user(kargs.compatible, &uargs->compatible)) return -EFAULT;
 
-    return 0;
-}
-
-int get_system_info_size_wrapper(struct mali_session_data *session_data, _mali_uk_get_system_info_size_s __user *uargs)
-{
-	_mali_uk_get_system_info_size_s kargs;
-    _mali_osk_errcode_t err;
-
-    MALI_CHECK_NON_NULL(uargs, -EINVAL);
-
-    kargs.ctx = session_data;
-    err = _mali_ukk_get_system_info_size(&kargs);
-    if (_MALI_OSK_ERR_OK != err) return map_errcode(err);
-
-    if (0 != put_user(kargs.size, &uargs->size)) return -EFAULT;
-
-    return 0;
-}
-
-int get_system_info_wrapper(struct mali_session_data *session_data, _mali_uk_get_system_info_s __user *uargs)
-{
-	_mali_uk_get_system_info_s kargs;
-    _mali_osk_errcode_t err;
-    _mali_system_info *system_info_user;
-    _mali_system_info *system_info_kernel;
-
-    MALI_CHECK_NON_NULL(uargs, -EINVAL);
-
-    if (0 != get_user(kargs.system_info, &uargs->system_info)) return -EFAULT;
-    if (0 != get_user(kargs.size, &uargs->size)) return -EFAULT;
-
-    /* A temporary kernel buffer for the system_info datastructure is passed through the system_info
-     * member. The ukk_private member will point to the user space destination of this buffer so
-     * that _mali_ukk_get_system_info() can correct the pointers in the system_info correctly
-     * for user space.
-     */
-    system_info_kernel = kmalloc(kargs.size, GFP_KERNEL);
-    if (NULL == system_info_kernel) return -EFAULT;
-
-    system_info_user = kargs.system_info;
-    kargs.system_info = system_info_kernel;
-    kargs.ukk_private = (u32)system_info_user;
-    kargs.ctx = session_data;
-
-    err = _mali_ukk_get_system_info(&kargs);
-    if (_MALI_OSK_ERR_OK != err)
-    {
-        kfree(system_info_kernel);
-        return map_errcode(err);
-    }
-
-    if (0 != copy_to_user(system_info_user, system_info_kernel, kargs.size))
-    {
-        kfree(system_info_kernel);
-        return -EFAULT;
-    }
-
-    kfree(system_info_kernel);
     return 0;
 }
 
@@ -160,3 +103,48 @@ int get_user_settings_wrapper(struct mali_session_data *session_data, _mali_uk_g
 
 	return 0;
 }
+
+#ifdef CONFIG_SYNC
+int stream_create_wrapper(struct mali_session_data *session_data, _mali_uk_stream_create_s __user *uargs)
+{
+	_mali_uk_stream_create_s kargs;
+	_mali_osk_errcode_t err;
+	char name[32];
+
+	MALI_CHECK_NON_NULL(uargs, -EINVAL);
+
+	snprintf(name, 32, "mali-%u", _mali_osk_get_pid());
+
+	kargs.ctx = session_data;
+	err = mali_stream_create(name, &kargs.fd);
+	if (_MALI_OSK_ERR_OK != err)
+	{
+		return map_errcode(err);
+	}
+
+	kargs.ctx = NULL; /* prevent kernel address to be returned to user space */
+	if (0 != copy_to_user(uargs, &kargs, sizeof(_mali_uk_stream_create_s))) return -EFAULT;
+
+	return 0;
+}
+
+int sync_fence_validate_wrapper(struct mali_session_data *session, _mali_uk_fence_validate_s __user *uargs)
+{
+	int fd;
+	_mali_osk_errcode_t err;
+
+	if (0 != get_user(fd, &uargs->fd))
+	{
+		return -EFAULT;
+	}
+
+	err = mali_fence_validate(fd);
+
+	if (_MALI_OSK_ERR_OK == err)
+	{
+		return 0;
+	}
+
+	return -EINVAL;
+}
+#endif

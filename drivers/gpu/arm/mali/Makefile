@@ -9,6 +9,8 @@
 #
 
 USE_UMPV2=0
+USING_PROFILING ?= 1
+USING_INTERNAL_PROFILING ?= 0
 
 OSKOS :=linux
 FILES_PREFIX=
@@ -25,7 +27,7 @@ ifeq ($(CONFIG_USING_MMU),y)
 USING_MMU=1
 endif
 
-ifeq ($(CONFIG_USING_UMP),y)
+ifeq ($(CONFIG_MALI400_UMP),y)
 USING_UMP=1
 endif
 
@@ -37,7 +39,7 @@ ifeq ($(CONFIG_USING_OS_MEMORY),y)
 USING_OS_MEMORY=1
 endif
 
-ifeq ($(CONFIG_MALI400_GPU_UTILIZATION),y)
+ifeq ($(CONFIG_MALI400_INTERNAL_PROFILING),y)
 USING_GPU_UTILIZATION =1
 endif
 
@@ -61,7 +63,7 @@ USING_OS_MEMORY ?= 0
 USING_GPU_UTILIZATION ?= 0
 USING_MALI_RUN_TIME_PM ?= 0
 USING_MALI_PMM_TESTSUITE ?= 0
-OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 6
+OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 16
 USING_PROFILING ?= 0
 USING_INTERNAL_PROFILING ?= 0
 TIMESTAMP ?= default
@@ -69,6 +71,10 @@ TARGET_PLATFORM ?= orion-m400
 MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP ?= 0
 MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED ?= 0
 MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS ?= 0
+PROFILING_SKIP_PP_JOBS ?= 0
+PROFILING_SKIP_PP_AND_GP_JOBS ?= 0
+MALI_UPPER_HALF_SCHEDULING ?= 1
+
 
 ifeq ($(USING_UMP),1)
 ifeq ($(USE_UMPV2),1)
@@ -111,8 +117,6 @@ DEFINES += -DMALI_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
 ifeq ($(CONFIG_MALI400_DEBUG),y)
 DEFINES += -DDEBUG
 endif
-DEFINES += -DSVN_REV=$(SVN_REV)
-DEFINES += -DSVN_REV_STRING=\"$(SVN_REV)\"
 
 # Linux has its own mmap cleanup handlers (see mali_kernel_mem_mmu.c)
 DEFINES += -DMALI_UKK_HAS_IMPLICIT_MMAP_CLEANUP
@@ -125,16 +129,16 @@ else
 endif
 
 # Target build file
-obj-$(CONFIG_MALI400MP)		+= mali.o
+obj-$(CONFIG_MALI400)		+= mali.o
 
 # Use our defines when compiling
 EXTRA_CFLAGS += $(DEFINES) -I$(MALI_FILE_PREFIX) -I$(MALI_FILE_PREFIX)/common -I$(MALI_FILE_PREFIX)/linux -I$(MALI_FILE_PREFIX)/platform -I$(MALI_FILE_PREFIX)/include
 
-
 OSKFILES = \
 	$(OSKOS)/mali_osk_irq.o \
-	$(OSKOS)/mali_osk_wait_queue.o \
+	$(OSKOS)/mali_osk_wq.o \
 	$(OSKOS)/mali_osk_low_level_mem.o \
+	$(OSKOS)/mali_osk_wait_queue.o \
 	$(OSKOS)/mali_osk_mali.o \
 	$(OSKOS)/mali_osk_notification.o \
 	$(OSKOS)/mali_osk_time.o \
@@ -157,6 +161,8 @@ UKKFILES=\
 ifeq ($(USING_PROFILING),1)
 UKKFILES+=\
         $(FILES_PREFIX)$(OSKOS)/mali_ukk_profiling.o
+OSKFILES+=\
+	$(FILES_PREFIX)$(OSKOS)/mali_osk_profiling.o
 endif
 
 # For customer releases the Linux Device Drivers will be provided as ARM proprietary and GPL releases:
@@ -173,7 +179,6 @@ endif
 mali-y := \
 	common/mali_kernel_core.o \
 	linux/mali_kernel_linux.o \
-	$(OSKOS)/mali_osk_indir_mmap.o \
 	common/mali_kernel_descriptor_mapping.o \
 	common/mali_session.o \
 	common/mali_device_pause_resume.o \
@@ -195,53 +200,76 @@ mali-y := \
 	common/mali_scheduler.o \
 	common/mali_gp_scheduler.o \
 	common/mali_pp_scheduler.o \
-	common/mali_cluster.o \
 	common/mali_group.o \
 	common/mali_dlbu.o \
+	common/mali_broadcast.o \
 	common/mali_pm.o \
 	common/mali_pmu.o \
 	common/mali_user_settings_db.o \
+        common/mali_kernel_utilization.o \
 	common/mali_l2_cache.o \
-	$(OSKOS)/mali_osk_pm.o \
-	linux/mali_kernel_pm.o \
+	linux/mali_osk_pm.o \
 	linux/mali_pmu_power_up_down.o \
+	__malidrv_build_info.o \
 	$(MALI_PLATFORM_FILE) \
 	$(OSKFILES) \
 	$(UKKFILES)
 
-ifeq ($(USING_PROFILING),1)
-mali-y += \
-	linux/mali_osk_profiling_gator.o \
-	timestamp-$(TIMESTAMP)/mali_timestamp.o
-EXTRA_CFLAGS += -I$(MALI_FILE_PREFIX)/timestamp-$(TIMESTAMP)
-endif
 
 ifeq ($(USING_INTERNAL_PROFILING),1)
 mali-y += \
-	common/mali_osk_profiling_internal.o \
+	linux/mali_osk_profiling_internal.o \
 	timestamp-$(TIMESTAMP)/mali_timestamp.o
 EXTRA_CFLAGS += -I$(MALI_FILE_PREFIX)/timestamp-$(TIMESTAMP)
 endif
 
+mali-$(CONFIG_DMA_SHARED_BUFFER) += \
+	linux/mali_dma_buf.o
 
-# Selecting files to compile by parsing the config file
+mali-$(CONFIG_SYNC) += \
+	linux/mali_sync.o \
+	linux/mali_sync_user.o
 
-ifeq ($(USING_GPU_UTILIZATION),1)
-mali-y += \
-	common/mali_kernel_utilization.o
+
+# Get subversion revision number, fall back to only ${MALI_RELEASE_NAME} if no svn info is available
+MALI_RELEASE_NAME=$(shell cat $(MALI_FILE_PREFIX)/.version 2> /dev/null)
+
+SVN_INFO = (cd $(MALI_FILE_PREFIX); (svn info || git svn info || \
+        echo -e "\nURL: $(MALI_RELEASE_NAME)\n" \
+        "Last Changed Rev: $(MALI_RELEASE_NAME)\n" \
+        "Last Changed Date: $(MALI_RELEASE_NAME)") 2>/dev/null)
+
+SVN_REV := $(shell (cd $(MALI_FILE_PREFIX); echo "$(SVN_INFO)" | grep '^Revision: '| sed -e 's/^Revision: //' ) 2>/dev/null )
+ifeq ($(SVN_REV),)
+SVN_REV := $(MALI_RELEASE_NAME)
+else
+SVN_REV := $(MALI_RELEASE_NAME)-r$(SVN_REV)
 endif
 
-ifneq ($(call submodule_enabled, $M, MALI400PP),0)
-        # Mali-400 PP in use
-	EXTRA_CFLAGS += -DUSING_MALI400
-endif
+DEFINES += -DSVN_REV=$(SVN_REV)
+DEFINES += -DSVN_REV_STRING=\"$(SVN_REV)\"
 
-ifneq ($(call submodule_enabled, $M, MALI300PP),0)
-        # Mali-400 PP in use
-	EXTRA_CFLAGS += -DUSING_MALI400
+VERSION_STRINGS :=
+VERSION_STRINGS += API_VERSION=$(shell cd $(MALI_FILE_PREFIX); grep "\#define _MALI_API_VERSION" $(FILES_PREFIX)include/linux/mali/mali_utgard_uk_types.h | cut -d' ' -f 3 )
+VERSION_STRINGS += REPO_URL=$(shell $(SVN_INFO) | grep '^URL: ' | cut -d: -f2- | cut -b2-)
+VERSION_STRINGS += REVISION=$(SVN_REV)
+VERSION_STRINGS += CHANGED_REVISION=$(shell $(SVN_INFO) | grep '^Last Changed Rev: ' | cut -d: -f2- | cut -b2-)
+VERSION_STRINGS += CHANGE_DATE=$(shell $(SVN_INFO) | grep '^Last Changed Date: ' | cut -d: -f2- | cut -b2-)
+VERSION_STRINGS += BUILD_DATE=$(shell date)
+ifdef CONFIG_MALI400_DEBUG
+VERSION_STRINGS += BUILD=debug
+else
+VERSION_STRINGS += BUILD=release
 endif
+VERSION_STRINGS += TARGET_PLATFORM=$(TARGET_PLATFORM)
+VERSION_STRINGS += MALI_PLATFORM=$(MALI_PLATFORM)
+VERSION_STRINGS += OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
+VERSION_STRINGS += USING_UMP=$(CONFIG_MALI400_UMP)
+VERSION_STRINGS += USING_PROFILING=$(CONFIG_MALI400_PROFILING)
+VERSION_STRINGS += USING_INTERNAL_PROFILING=$(CONFIG_MALI400_INTERNAL_PROFILING)
+VERSION_STRINGS += USING_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
+VERSION_STRINGS += MALI_UPPER_HALF_SCHEDULING=$(MALI_UPPER_HALF_SCHEDULING)
 
-ifneq ($(call submodule_enabled, $M, MALI200),0)
-        # Mali200 in use
-	EXTRA_CFLAGS += -DUSING_MALI200
-endif
+# Create file with Mali driver configuration
+$(MALI_FILE_PREFIX)/__malidrv_build_info.c:
+	@echo 'const char *__malidrv_build_info(void) { return "malidrv: $(VERSION_STRINGS)";}' > $(MALI_FILE_PREFIX)/__malidrv_build_info.c
