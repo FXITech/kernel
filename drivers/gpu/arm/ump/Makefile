@@ -8,7 +8,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-ifeq ($(CONFIG_USING_OS_MEMORY),y)
+ifeq ($(CONFIG_UMP_USING_OS_MEMORY),y)
 USING_MEMORY_TYPE=1
 endif
 

@@ -17,3 +17,10 @@ config UMP_DEBUG
 	default n
 	---help---
 		This enables UMP driver debug messages
+
+config UMP_USING_OS_MEMORY
+	bool "Using OS memory"
+	depends on UMP
+	default y
+	---help---
+		This makes UMP use OS memory.
