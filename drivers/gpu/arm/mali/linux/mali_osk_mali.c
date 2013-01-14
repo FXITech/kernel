@@ -21,8 +21,6 @@
 #include "mali_kernel_common.h" /* MALI_xxx macros */
 #include "mali_osk.h"           /* kernel side OS functions */
 #include "mali_uk_types.h"
-#include <mach/irqs.h>
-#include <mach/mali/config.h>        /* contains the configuration of the arch we are compiling for */
 #include "mali_kernel_linux.h"   /* XXX: arch/config.h was changed with this... */
 
 

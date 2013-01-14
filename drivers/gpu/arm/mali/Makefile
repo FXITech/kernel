@@ -9,8 +9,6 @@
 #
 
 USE_UMPV2=0
-USING_PROFILING ?= 1
-USING_INTERNAL_PROFILING ?= 0
 
 OSKOS :=linux
 FILES_PREFIX=
@@ -23,32 +21,12 @@ MACHDIR  := $(srctree)/arch/arm/mach-exynos
 MALICONFIGDIR :=$(MACHDIR)/include/mach/mali
 #endif
 
-ifeq ($(CONFIG_USING_MMU),y)
-USING_MMU=1
-endif
-
 ifeq ($(CONFIG_MALI400_UMP),y)
 USING_UMP=1
 endif
 
-ifeq ($(CONFIG_USING_MMU),y)
-USING_MMU=1
-endif
-
-ifeq ($(CONFIG_USING_OS_MEMORY),y)
-USING_OS_MEMORY=1
-endif
-
 ifeq ($(CONFIG_MALI400_INTERNAL_PROFILING),y)
 USING_GPU_UTILIZATION =1
-endif
-
-ifeq ($(CONFIG_USING_MALI_RUN_TIME_PM),y)
-USING_MALI_RUN_TIME_PM =1
-endif
-
-ifeq ($(CONFIG_USING_MALI_PMM_TESTSUITE),y)
-USING_MALI_PMM_TESTSUITE=1
 endif
 
 ifeq ($(CONFIG_MALI400_PROFILING),y)
@@ -57,12 +35,8 @@ endif
 
 # set up defaults if not defined by the user
 ARCH ?= arm
-USING_MMU ?= 1
 USING_UMP ?= 0
-USING_OS_MEMORY ?= 0
 USING_GPU_UTILIZATION ?= 0
-USING_MALI_RUN_TIME_PM ?= 0
-USING_MALI_PMM_TESTSUITE ?= 0
 OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 16
 USING_PROFILING ?= 0
 USING_INTERNAL_PROFILING ?= 0
@@ -76,27 +50,11 @@ PROFILING_SKIP_PP_AND_GP_JOBS ?= 0
 MALI_UPPER_HALF_SCHEDULING ?= 1
 
 
-ifeq ($(USING_UMP),1)
-ifeq ($(USE_UMPV2),1)
-	UMP_SYMVERS_FILE ?= ../umpv2/Module.symvers
-else
-	UMP_SYMVERS_FILE ?= ../ump/Module.symvers
-endif
-	KBUILD_EXTRA_SYMBOLS = $(KBUILD_EXTMOD)/$(UMP_SYMVERS_FILE)
-endif
-
-# Check if a Mali Core sub module should be enabled, true or false returned
-submodule_enabled = $(shell gcc $(DEFINES) -E $(MALICONFIGDIR)/config.h | grep type | grep -c $(2))
-
 # Set up our defines, which will be passed to gcc
-DEFINES += -DUSING_OS_MEMORY=$(USING_OS_MEMORY)
-DEFINES += -DUSING_MMU=$(USING_MMU)
 DEFINES += -DUSING_UMP=$(USING_UMP)
 DEFINES += -D_MALI_OSK_SPECIFIC_INDIRECT_MMAP
 DEFINES += -DMALI_TIMELINE_PROFILING_ENABLED=$(USING_PROFILING)
 DEFINES += -DMALI_INTERNAL_TIMELINE_PROFILING_ENABLED=$(USING_INTERNAL_PROFILING)
-DEFINES += -DMALI_POWER_MGMT_TEST_SUITE=$(USING_MALI_PMM_TESTSUITE)
-DEFINES += -DMALI_PMM_RUNTIME_JOB_CONTROL_ON=$(USING_MALI_RUN_TIME_PM)
 DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP)
 DEFINES += -DMALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED=$(MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED)
 DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS)
@@ -106,13 +64,9 @@ DEFINES += -DMALI_STATE_TRACKING=1
 DEFINES += -DMALI_STATE_TRACKING_USING_PROC=1
 DEFINES += -DMALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
 
-ifneq ($(call submodule_enabled, $M, PMU),0)
-        MALI_PLATFORM_FILE = platform/mali400-pmu/mali_platform.o
-else
-        MALI_PLATFORM_FILE = platform/$(TARGET_PLATFORM)/mali_platform.o
-endif
-
-DEFINES += -DMALI_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
+DEFINES += -DUSING_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
+DEFINES += -DPROFILING_SKIP_PP_JOBS=$(PROFILING_SKIP_PP_JOBS)
+DEFINES += -DPROFILING_SKIP_PP_AND_GP_JOBS=$(PROFILING_SKIP_PP_AND_GP_JOBS)
 
 ifeq ($(CONFIG_MALI400_DEBUG),y)
 DEFINES += -DDEBUG
@@ -130,6 +84,11 @@ endif
 
 # Target build file
 obj-$(CONFIG_MALI400)		+= mali.o
+
+MALI_RELEASE_NAME=$(shell cat $(MALI_FILE_PREFIX)/.version 2> /dev/null)
+
+DEFINES += -DSVN_REV=$(MALI_RELEASE_NAME)
+DEFINES += -DSVN_REV_STRING=\"$(MALI_RELEASE_NAME)\"
 
 # Use our defines when compiling
 EXTRA_CFLAGS += $(DEFINES) -I$(MALI_FILE_PREFIX) -I$(MALI_FILE_PREFIX)/common -I$(MALI_FILE_PREFIX)/linux -I$(MALI_FILE_PREFIX)/platform -I$(MALI_FILE_PREFIX)/include
@@ -211,7 +170,6 @@ mali-y := \
 	linux/mali_osk_pm.o \
 	linux/mali_pmu_power_up_down.o \
 	__malidrv_build_info.o \
-	$(MALI_PLATFORM_FILE) \
 	$(OSKFILES) \
 	$(UKKFILES)
 
@@ -231,30 +189,9 @@ mali-$(CONFIG_SYNC) += \
 	linux/mali_sync_user.o
 
 
-# Get subversion revision number, fall back to only ${MALI_RELEASE_NAME} if no svn info is available
-MALI_RELEASE_NAME=$(shell cat $(MALI_FILE_PREFIX)/.version 2> /dev/null)
-
-SVN_INFO = (cd $(MALI_FILE_PREFIX); (svn info || git svn info || \
-        echo -e "\nURL: $(MALI_RELEASE_NAME)\n" \
-        "Last Changed Rev: $(MALI_RELEASE_NAME)\n" \
-        "Last Changed Date: $(MALI_RELEASE_NAME)") 2>/dev/null)
-
-SVN_REV := $(shell (cd $(MALI_FILE_PREFIX); echo "$(SVN_INFO)" | grep '^Revision: '| sed -e 's/^Revision: //' ) 2>/dev/null )
-ifeq ($(SVN_REV),)
-SVN_REV := $(MALI_RELEASE_NAME)
-else
-SVN_REV := $(MALI_RELEASE_NAME)-r$(SVN_REV)
-endif
-
-DEFINES += -DSVN_REV=$(SVN_REV)
-DEFINES += -DSVN_REV_STRING=\"$(SVN_REV)\"
-
 VERSION_STRINGS :=
 VERSION_STRINGS += API_VERSION=$(shell cd $(MALI_FILE_PREFIX); grep "\#define _MALI_API_VERSION" $(FILES_PREFIX)include/linux/mali/mali_utgard_uk_types.h | cut -d' ' -f 3 )
-VERSION_STRINGS += REPO_URL=$(shell $(SVN_INFO) | grep '^URL: ' | cut -d: -f2- | cut -b2-)
 VERSION_STRINGS += REVISION=$(SVN_REV)
-VERSION_STRINGS += CHANGED_REVISION=$(shell $(SVN_INFO) | grep '^Last Changed Rev: ' | cut -d: -f2- | cut -b2-)
-VERSION_STRINGS += CHANGE_DATE=$(shell $(SVN_INFO) | grep '^Last Changed Date: ' | cut -d: -f2- | cut -b2-)
 VERSION_STRINGS += BUILD_DATE=$(shell date)
 ifdef CONFIG_MALI400_DEBUG
 VERSION_STRINGS += BUILD=debug
