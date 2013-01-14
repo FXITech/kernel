@@ -41,6 +41,7 @@ obj-$(CONFIG_MACH_NURI)			+= mach-nuri.o
 obj-$(CONFIG_MACH_ORIGEN)		+= mach-origen.o
 obj-$(CONFIG_MACH_FXI_C210)		+= mach-fxi_c210.o fxi-fxiid.o
 CFLAGS_fxi-fxiid.o += -I$(srctree)/drivers/w1
+CFLAGS_mach-fxi_c210.o += -I$(srctree)/drivers/gpu/arm/mali/include
 
 obj-$(CONFIG_MACH_SMDK4212)		+= mach-smdk4x12.o
 obj-$(CONFIG_MACH_SMDK4412)		+= mach-smdk4x12.o

@@ -21,11 +21,15 @@
 #include <linux/mfd/max8997.h>
 #include <linux/rfkill-gpio.h>
 #include <linux/pm_domain.h>
+#include <linux/pm_runtime.h>
 #include <linux/w1-gpio.h>
+#include <linux/clk.h>
 
 #include <linux/dma-mapping.h>
 #include <linux/memblock.h>
 #include <linux/dma-contiguous.h>
+
+#include <linux/mali/mali_utgard.h>
 
 #include <asm/mach/arch.h>
 #include <asm/hardware/gic.h>
@@ -70,6 +74,26 @@
 #define FXI_C210_UFCON_DEFAULT	(S3C2410_UFCON_FIFOMODE |	\
 				 S5PV210_UFCON_TXTRIG4 |	\
 				 S5PV210_UFCON_RXTRIG4)
+
+#define MALI_BASE_ADDR 0x13000000
+
+#define MALI_GPU_FREQ (160 * 1000000)
+
+#define MALI_IRQ_PPMMU0 COMBINER_IRQ(13, 0)
+#define MALI_IRQ_PPMMU1 COMBINER_IRQ(13, 1)
+#define MALI_IRQ_PPMMU2 COMBINER_IRQ(13, 2)
+#define MALI_IRQ_PPMMU3 COMBINER_IRQ(13, 3)
+#define MALI_IRQ_GPMMU COMBINER_IRQ(13, 4)
+#define MALI_IRQ_PP0 COMBINER_IRQ(14, 0)
+#define MALI_IRQ_PP1 COMBINER_IRQ(14, 1)
+#define MALI_IRQ_PP2 COMBINER_IRQ(14, 2)
+#define MALI_IRQ_PP3 COMBINER_IRQ(14, 3)
+#define MALI_IRQ_GP COMBINER_IRQ(14, 4)
+#define MALI_IRQ_PMU COMBINER_IRQ(14, 5)
+
+#define MPLLCLK_NAME "mout_mpll"
+#define GPUMOUT0CLK_NAME "mout_g3d0"
+#define GPUCLK_NAME "sclk_g3d"
 
 static struct s3c2410_uartcfg fxi_c210_uartcfgs[] __initdata = {
 	[0] = {
@@ -693,9 +717,83 @@ static struct platform_device fxi_fxiid = {
   .id = -1,
  }; 
 
-static struct platform_device fxi_mali = {
-  .name = "mali_drm",
-  .id = -1,
+static int init_mali_clock(void)
+{
+	struct clk *mpll_clock;
+	struct clk *mali_parent_clock;
+	struct clk *mali_clock;
+	unsigned int freq = MALI_GPU_FREQ;
+
+	mpll_clock = clk_get(NULL, MPLLCLK_NAME);
+
+	if (IS_ERR(mpll_clock)) {
+		printk(KERN_ERR "%s: failed to get mpll clock\n", __func__);
+		return -EINVAL;
+	}
+
+	mali_parent_clock = clk_get(NULL, GPUMOUT0CLK_NAME);
+
+	if (IS_ERR(mali_parent_clock)) {
+		printk(KERN_ERR "%s: failed to get source mali parent clock\n", __func__);
+		return -EINVAL;
+	}
+
+	mali_clock = clk_get(NULL, GPUCLK_NAME);
+
+	if (IS_ERR(mali_clock)) {
+		printk(KERN_ERR "%s: failed to get source mali clock\n", __func__);
+		return -EINVAL;
+	}
+
+	clk_set_parent(mali_parent_clock, mpll_clock);
+	clk_set_parent(mali_clock, mali_parent_clock);
+	clk_set_rate(mali_clock, freq);
+
+	printk(KERN_DEBUG "%s: mali_clock set to %uHz\n", __func__, freq);
+
+	return 0;
+}
+
+static struct resource mali_gpu_resource[] = {
+	MALI_GPU_RESOURCES_MALI400_MP4_PMU(MALI_BASE_ADDR,
+					   MALI_IRQ_GP, MALI_IRQ_GPMMU,
+					   MALI_IRQ_PP0, MALI_IRQ_PPMMU0,
+					   MALI_IRQ_PP1, MALI_IRQ_PPMMU1,
+					   MALI_IRQ_PP2, MALI_IRQ_PPMMU2,
+					   MALI_IRQ_PP3, MALI_IRQ_PPMMU3)
+};
+
+static struct mali_gpu_device_data mali_device_data = {
+	.shared_mem_size = 0x18000000, /* ~400MiB */
+};
+
+static struct platform_device mali_gpu = {
+	.name = MALI_GPU_NAME_UTGARD,
+	.id = 0,
+	.num_resources = ARRAY_SIZE(mali_gpu_resource),
+	.resource = mali_gpu_resource,
+};
+
+static void init_mali_gpu(void)
+{
+	if (init_mali_clock() < 0) {
+		printk(KERN_ERR "%s: Error initializing mali clock\n", __func__);
+		return;
+	}
+	if (platform_device_add_data(&mali_gpu, &mali_device_data, sizeof (mali_device_data)) < 0) {
+		printk(KERN_ERR "%s: Error setting mali device data\n",__func__);
+		return;
+	}
+	if (platform_device_register(&mali_gpu) < 0) {
+		printk(KERN_ERR "%s: Error registering mali device\n",__func__);
+		return;
+	}
+	pm_runtime_enable(&mali_gpu.dev);
+}
+
+static struct platform_device fxi_mali_drm = {
+	.name = "mali_drm",
+	.id = -1,
 };
 
 static struct platform_device ccandy_audio = {
@@ -753,7 +851,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&btbutton_device_gpiokeys,
 	&fxi_w1_gpio,
   	&fxi_fxiid,
-	&fxi_mali,
+	&fxi_mali_drm,
 	&ccandy_audio,
 };
 
@@ -845,6 +943,7 @@ static void __init fxi_c210_machine_init(void)
 	s5p_hdmi_cec_set_platdata(&hdmi_cec_data);
 
 	setup_power5v_gpio();
+	init_mali_gpu();
 
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
 }
