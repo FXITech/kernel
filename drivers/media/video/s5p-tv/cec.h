@@ -20,6 +20,7 @@
  *
  * Higher layer must use only the declarations included in this file.
  ****************************************************************************/
+#include <linux/platform_device.h>
 
 #define to_tvout_plat(d) (to_platform_device(d)->dev.platform_data)
 

@@ -233,6 +233,10 @@ static struct miscdevice cec_misc_device = {
 	.fops  = &cec_fops,
 };
 
+#ifdef CONFIG_VIDEO_SAMSUNG_S5P_HDMI_CEC_EVENT
+	extern void hdmi_cec_event_rx(void);
+#endif
+
 static irqreturn_t s5p_cec_irq_handler(int irq, void *dev_id)
 {
 	u32 status = 0;
@@ -283,6 +287,9 @@ static irqreturn_t s5p_cec_irq_handler(int irq, void *dev_id)
 		s5p_clr_pending_rx();
 
 		wake_up_interruptible(&cec_rx_struct.waitq);
+#ifdef CONFIG_VIDEO_SAMSUNG_S5P_HDMI_CEC_EVENT
+        hdmi_cec_event_rx();
+#endif
 	}
 
 	return IRQ_HANDLED;

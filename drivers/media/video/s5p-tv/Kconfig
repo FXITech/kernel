@@ -86,6 +86,15 @@ config VIDEO_SAMSUNG_S5P_HDMI_CEC
 	  interface in S5P Samsung SoC. The driver can be compiled
 	  as module.
 
+config VIDEO_SAMSUNG_S5P_HDMI_CEC_EVENT
+	tristate "HDMI CEC Input Event module"
+	depends on VIDEO_DEV && VIDEO_V4L2 && I2C
+	depends on VIDEO_SAMSUNG_S5P_HDMI_CEC
+	help
+	  Say Y here if you want support for the HDMI CEC events
+	  support in Samsung S5P SoC. The driver can be compiled
+	  as module.
+
 config VIDEO_SAMSUNG_S5P_MIXER_DEBUG
 	bool "Enable debug for Mixer Driver"
 	depends on VIDEO_SAMSUNG_S5P_MIXER

@@ -36,6 +36,7 @@
 #include <media/v4l2-device.h>
 
 #include "regs-hdmi.h"
+#include "hdmi_cec_event.h"
 
 MODULE_AUTHOR("Tomasz Stanislawski, <t.stanislaws@samsung.com>");
 MODULE_DESCRIPTION("Samsung HDMI");
@@ -214,6 +215,9 @@ static irqreturn_t hdmi_irq_handler(int irq, void *dev_data)
 	/* clearing flags for HPD plug/unplug */
 	if (intc_flag & HDMI_INTC_FLAG_HPD_UNPLUG) {
 		printk(KERN_INFO "unplugged\n");
+#ifdef CONFIG_VIDEO_SAMSUNG_S5P_HDMI_CEC_EVENT
+		hdmi_cec_stop();
+#endif
 		hdmi_write_mask(hdev, HDMI_INTC_FLAG, ~0,
 			HDMI_INTC_FLAG_HPD_UNPLUG);
 	}
@@ -221,6 +225,9 @@ static irqreturn_t hdmi_irq_handler(int irq, void *dev_data)
 		printk(KERN_INFO "plugged\n");
 		hdmi_write_mask(hdev, HDMI_INTC_FLAG, ~0,
 			HDMI_INTC_FLAG_HPD_PLUG);
+#ifdef CONFIG_VIDEO_SAMSUNG_S5P_HDMI_CEC_EVENT
+		hdmi_cec_start();
+#endif
 	}
 
 	return IRQ_HANDLED;
