@@ -538,7 +538,7 @@ _mali_osk_errcode_t _mali_ukk_gp_suspend_response( _mali_uk_gp_suspend_response_
 
 /** @} */ /* end group _mali_uk_gp */
 
-#if defined(CONFIG_MALI400_PROFILING)
+#if defined(CONFIG_MALI400_PROFILING) || defined(CONFIG_MALI400_INTERNAL_PROFILING)
 /** @addtogroup _mali_uk_profiling U/K Timeline profiling module
  * @{ */
 

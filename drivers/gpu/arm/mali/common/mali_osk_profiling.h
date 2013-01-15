@@ -11,7 +11,7 @@
 #ifndef __MALI_OSK_PROFILING_H__
 #define __MALI_OSK_PROFILING_H__
 
-#if defined(CONFIG_MALI400_PROFILING) && defined (CONFIG_TRACEPOINTS)
+#if defined(CONFIG_MALI400_PROFILING) || defined(CONFIG_MALI400_INTERNAL_PROFILING)
 
 #include "mali_linux_trace.h"
 #include "mali_profiling_events.h"

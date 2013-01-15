@@ -13,9 +13,17 @@ config MALI400_UMP
         ---help---
                 This enables support for the UMP memory sharing API in the Mali driver.
 
+config MALI400_USING_GPU_UTILIZATION
+	bool "GPU utilization"
+	depends on MALI400
+	default n
+	---help---
+		This enables GPU utilization information.
+
 config MALI400_INTERNAL_PROFILING
 	bool "Enable internal Mali profiling API"
         depends on MALI400
+	select TRACEPOINTS
         default n
         ---help---
                 This enables the internal legacy Mali profiling API.

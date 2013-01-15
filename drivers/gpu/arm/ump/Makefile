@@ -12,9 +12,6 @@ ifeq ($(CONFIG_UMP_USING_OS_MEMORY),y)
 USING_MEMORY_TYPE=1
 endif
 
-UMP_FILE_PREFIX := drivers/gpu/arm/ump/
-UDD_FILE_PREFIX := drivers/gpu/arm/ump/
-
 # For each arch check: CROSS_COMPILE , KDIR , CFLAGS += -DARCH
 
 ## @note Should allow overriding of building UMP for non-debug:
@@ -25,20 +22,21 @@ endif
 EXTRA_CFLAGS += -DMALI_STATE_TRACKING=0
 USING_MEMORY_TYPE ?=0 # 0: dedicated memory 1: OS memory
 
-EXTRA_CFLAGS += -I$(UDD_FILE_PREFIX) -I$(UDD_FILE_PREFIX)/common -I$(UDD_FILE_PREFIX)/linux -I$(UDD_FILE_PREFIX)/../mali/common -I$(UDD_FILE_PREFIX)/../mali/linux -I$(UDD_FILE_PREFIX)/include
+EXTRA_CFLAGS += -I$(src) -I$(src)/common -I$(src)/linux -I$(src)/include -I$(src)/linux/license/gpl
+EXTRA_CFLAGS += -I$(src)/../mali/common -I$(src)/../mali/linux
 
 EXTRA_CFLAGS += -DUMP_MEMORY_TYPE=$(USING_MEMORY_TYPE)
-# For customer releases the Linux Device Drivers will be provided as ARM proprietary and GPL releases:
-# The ARM proprietary product will only include the license/proprietary directory
-# The GPL product will only include the license/gpl directory
 
-ifeq ($(wildcard $(UDD_FILE_PREFIX)/linux/license/gpl/*),)
-EXTRA_CFLAGS += -I$(UDD_FILE_PREFIX)/linux/license/proprietary
-else
-EXTRA_CFLAGS += -I$(UDD_FILE_PREFIX)/linux/license/gpl
+obj-$(CONFIG_UMP) += ump.o
+
+MALI_OSKFILES =
+ifneq ($(CONFIG_MALI400),y)
+MALI_OSKFILES = ../mali/linux/mali_osk_atomics.o \
+            ../mali/linux/mali_osk_locks.o \
+            ../mali/linux/mali_osk_math.o \
+            ../mali/linux/mali_osk_memory.o \
+            ../mali/linux/mali_osk_misc.o
 endif
-
-obj-$(CONFIG_UMP)       += ump.o
 
 ump-y:=	common/ump_kernel_common.o \
 	common/ump_kernel_descriptor_mapping.o \
@@ -53,15 +51,10 @@ ump-y:=	common/ump_kernel_common.o \
 	linux/ump_osk_atomics.o \
 	linux/ump_osk_low_level_mem.o \
 	linux/ump_osk_misc.o \
-	../mali/linux/mali_osk_atomics.o \
-	../mali/linux/mali_osk_locks.o \
-	../mali/linux/mali_osk_memory.o \
-	../mali/linux/mali_osk_math.o \
-	../mali/linux/mali_osk_misc.o
+	$(MALI_OSKFILES)
 
 
-# Get subversion revision number, fall back to 0000 if no svn info is available
-SVN_REV:=$(shell ((svnversion | grep -qvE '(exported|Unversioned)' && echo -n 'Revision: ' && svnversion) || git svn info | sed -e 's/$$$$/M/' | grep '^Revision: ' || echo ${MALI_RELEASE_NAME}) 2>/dev/null | sed -e 's/^Revision: //')
+SVN_REV:=$(shell cat $(src)/.version 2> /dev/null)
 
 EXTRA_CFLAGS += -DSVN_REV=$(SVN_REV)
 EXTRA_CFLAGS += -DSVN_REV_STRING=\"$(SVN_REV)\"

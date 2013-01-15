@@ -39,7 +39,7 @@
 #endif
 
 /* Streamline support for the Mali driver */
-#if defined(CONFIG_TRACEPOINTS) && defined(CONFIG_MALI400_PROFILING)
+#if defined(CONFIG_MALI400_PROFILING) || defined(CONFIG_MALI400_INTERNAL_PROFILING)
 /* Ask Linux to create the tracepoints */
 #define CREATE_TRACE_POINTS
 #include "mali_linux_trace.h"
@@ -72,7 +72,7 @@ extern int mali_shared_mem_size;
 module_param(mali_shared_mem_size, int, S_IRUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_shared_mem_size, "Size of shared Mali GPU memory.");
 
-#if defined(CONFIG_MALI400_PROFILING)
+#if defined(CONFIG_MALI400_INTERNAL_PROFILING)
 extern int mali_boot_profiling;
 module_param(mali_boot_profiling, int, S_IRUSR | S_IRGRP | S_IROTH);
 MODULE_PARM_DESC(mali_boot_profiling, "Start profiling as a part of Mali driver initialization");

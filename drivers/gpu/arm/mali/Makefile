@@ -8,40 +8,29 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-USE_UMPV2=0
-
-OSKOS :=linux
-FILES_PREFIX=
-MALI_FILE_PREFIX := $(srctree)/drivers/gpu/arm/mali
-KBUILDROOT =
-
-# Add platform configuration file for Mali
-#ifeq ($(CONFIG_ARCH_EXYNOS4),y)
-MACHDIR  := $(srctree)/arch/arm/mach-exynos
-MALICONFIGDIR :=$(MACHDIR)/include/mach/mali
-#endif
-
 ifeq ($(CONFIG_MALI400_UMP),y)
 USING_UMP=1
 endif
 
 ifeq ($(CONFIG_MALI400_INTERNAL_PROFILING),y)
-USING_GPU_UTILIZATION =1
+USING_INTERNAL_PROFILING = 1
 endif
 
 ifeq ($(CONFIG_MALI400_PROFILING),y)
 USING_PROFILING =1
 endif
 
+ifeq ($(CONFIG_MALI400_USING_GPU_UTILIZATION),y)
+USING_GPU_UTILIZATION =1
+endif
+
 # set up defaults if not defined by the user
-ARCH ?= arm
 USING_UMP ?= 0
 USING_GPU_UTILIZATION ?= 0
 OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB ?= 16
 USING_PROFILING ?= 0
 USING_INTERNAL_PROFILING ?= 0
 TIMESTAMP ?= default
-TARGET_PLATFORM ?= orion-m400
 MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP ?= 0
 MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED ?= 0
 MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS ?= 0
@@ -50,18 +39,8 @@ PROFILING_SKIP_PP_AND_GP_JOBS ?= 0
 MALI_UPPER_HALF_SCHEDULING ?= 1
 
 
-# Set up our defines, which will be passed to gcc
-DEFINES += -DUSING_UMP=$(USING_UMP)
-DEFINES += -D_MALI_OSK_SPECIFIC_INDIRECT_MMAP
-DEFINES += -DMALI_TIMELINE_PROFILING_ENABLED=$(USING_PROFILING)
-DEFINES += -DMALI_INTERNAL_TIMELINE_PROFILING_ENABLED=$(USING_INTERNAL_PROFILING)
-DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP)
-DEFINES += -DMALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED=$(MALI_PP_SCHEDULER_KEEP_SUB_JOB_STARTS_ALIGNED)
-DEFINES += -DMALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS=$(MALI_PP_SCHEDULER_FORCE_NO_JOB_OVERLAP_BETWEEN_APPS)
-
 # MALI_STATE_TRACKING is only supported on Linux kernels from version 2.6.32.
 DEFINES += -DMALI_STATE_TRACKING=1
-DEFINES += -DMALI_STATE_TRACKING_USING_PROC=1
 DEFINES += -DMALI_OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
 
 DEFINES += -DUSING_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
@@ -72,12 +51,8 @@ ifeq ($(CONFIG_MALI400_DEBUG),y)
 DEFINES += -DDEBUG
 endif
 
-# Linux has its own mmap cleanup handlers (see mali_kernel_mem_mmu.c)
-DEFINES += -DMALI_UKK_HAS_IMPLICIT_MMAP_CLEANUP
-
 ifeq ($(USING_UMP),1)
-	DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=1
-	EXTRA_CFLAGS += -I$(MALI_FILE_PREFIX)/../ump/include
+	DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=1 -I$(src)/../ump/include
 else
 	DEFINES += -DMALI_USE_UNIFIED_MEMORY_PROVIDER=0
 endif
@@ -85,54 +60,43 @@ endif
 # Target build file
 obj-$(CONFIG_MALI400)		+= mali.o
 
-MALI_RELEASE_NAME=$(shell cat $(MALI_FILE_PREFIX)/.version 2> /dev/null)
+MALI_RELEASE_NAME=$(shell cat $(src)/.version 2> /dev/null)
 
 DEFINES += -DSVN_REV=$(MALI_RELEASE_NAME)
 DEFINES += -DSVN_REV_STRING=\"$(MALI_RELEASE_NAME)\"
 
 # Use our defines when compiling
-EXTRA_CFLAGS += $(DEFINES) -I$(MALI_FILE_PREFIX) -I$(MALI_FILE_PREFIX)/common -I$(MALI_FILE_PREFIX)/linux -I$(MALI_FILE_PREFIX)/platform -I$(MALI_FILE_PREFIX)/include
+EXTRA_CFLAGS += $(DEFINES) -I$(src) -I$(src)/common -I$(src)/linux -I$(src)/include
 
 OSKFILES = \
-	$(OSKOS)/mali_osk_irq.o \
-	$(OSKOS)/mali_osk_wq.o \
-	$(OSKOS)/mali_osk_low_level_mem.o \
-	$(OSKOS)/mali_osk_wait_queue.o \
-	$(OSKOS)/mali_osk_mali.o \
-	$(OSKOS)/mali_osk_notification.o \
-	$(OSKOS)/mali_osk_time.o \
-	$(OSKOS)/mali_osk_timers.o
-
-ifneq ($(CONFIG_UMP),y)
-OSKFILES += $(OSKOS)/mali_osk_atomics.o \
-            $(OSKOS)/mali_osk_locks.o \
-            $(OSKOS)/mali_osk_math.o \
-            $(OSKOS)/mali_osk_memory.o \
-            $(OSKOS)/mali_osk_misc.o
-endif
+	linux/mali_osk_irq.o \
+	linux/mali_osk_wq.o \
+	linux/mali_osk_low_level_mem.o \
+	linux/mali_osk_wait_queue.o \
+	linux/mali_osk_mali.o \
+	linux/mali_osk_notification.o \
+	linux/mali_osk_time.o \
+	linux/mali_osk_timers.o \
+	linux/mali_osk_atomics.o \
+	linux/mali_osk_locks.o \
+	linux/mali_osk_math.o \
+	linux/mali_osk_memory.o \
+	linux/mali_osk_misc.o
 
 UKKFILES=\
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_mem.o \
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_gp.o \
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_pp.o \
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_core.o
+        linux/mali_ukk_mem.o \
+        linux/mali_ukk_gp.o \
+        linux/mali_ukk_pp.o \
+        linux/mali_ukk_core.o
 
 ifeq ($(USING_PROFILING),1)
 UKKFILES+=\
-        $(FILES_PREFIX)$(OSKOS)/mali_ukk_profiling.o
+        linux/mali_ukk_profiling.o
 OSKFILES+=\
-	$(FILES_PREFIX)$(OSKOS)/mali_osk_profiling.o
+	linux/mali_osk_profiling.o
 endif
 
-# For customer releases the Linux Device Drivers will be provided as ARM proprietary and GPL releases:
-# The ARM proprietary product will only include the license/proprietary directory
-# The GPL product will only include the license/gpl directory
-
-ifeq ($(wildcard $(MALI_FILE_PREFIX)/linux/license/gpl/*),)
-EXTRA_CFLAGS += -I$(MALI_FILE_PREFIX)/linux/license/proprietary
-else
-EXTRA_CFLAGS += -I$(MALI_FILE_PREFIX)/linux/license/gpl
-endif
+EXTRA_CFLAGS += -I$(src)/linux/license/gpl
 
 # Source files which always are included in a build
 mali-y := \
@@ -176,9 +140,9 @@ mali-y := \
 
 ifeq ($(USING_INTERNAL_PROFILING),1)
 mali-y += \
-	linux/mali_osk_profiling_internal.o \
+	linux/mali_profiling_internal.o \
 	timestamp-$(TIMESTAMP)/mali_timestamp.o
-EXTRA_CFLAGS += -I$(MALI_FILE_PREFIX)/timestamp-$(TIMESTAMP)
+EXTRA_CFLAGS += -I$(src)/timestamp-$(TIMESTAMP)
 endif
 
 mali-$(CONFIG_DMA_SHARED_BUFFER) += \
@@ -190,7 +154,7 @@ mali-$(CONFIG_SYNC) += \
 
 
 VERSION_STRINGS :=
-VERSION_STRINGS += API_VERSION=$(shell cd $(MALI_FILE_PREFIX); grep "\#define _MALI_API_VERSION" $(FILES_PREFIX)include/linux/mali/mali_utgard_uk_types.h | cut -d' ' -f 3 )
+VERSION_STRINGS += API_VERSION=$(shell cd $(src); grep "\#define _MALI_API_VERSION" include/linux/mali/mali_utgard_uk_types.h | cut -d' ' -f 3 )
 VERSION_STRINGS += REVISION=$(SVN_REV)
 VERSION_STRINGS += BUILD_DATE=$(shell date)
 ifdef CONFIG_MALI400_DEBUG
@@ -198,8 +162,6 @@ VERSION_STRINGS += BUILD=debug
 else
 VERSION_STRINGS += BUILD=release
 endif
-VERSION_STRINGS += TARGET_PLATFORM=$(TARGET_PLATFORM)
-VERSION_STRINGS += MALI_PLATFORM=$(MALI_PLATFORM)
 VERSION_STRINGS += OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB=$(OS_MEMORY_KERNEL_BUFFER_SIZE_IN_MB)
 VERSION_STRINGS += USING_UMP=$(CONFIG_MALI400_UMP)
 VERSION_STRINGS += USING_PROFILING=$(CONFIG_MALI400_PROFILING)
@@ -208,5 +170,5 @@ VERSION_STRINGS += USING_GPU_UTILIZATION=$(USING_GPU_UTILIZATION)
 VERSION_STRINGS += MALI_UPPER_HALF_SCHEDULING=$(MALI_UPPER_HALF_SCHEDULING)
 
 # Create file with Mali driver configuration
-$(MALI_FILE_PREFIX)/__malidrv_build_info.c:
-	@echo 'const char *__malidrv_build_info(void) { return "malidrv: $(VERSION_STRINGS)";}' > $(MALI_FILE_PREFIX)/__malidrv_build_info.c
+$(src)/__malidrv_build_info.c:
+	@echo 'const char *__malidrv_build_info(void) { return "malidrv: $(VERSION_STRINGS)";}' > $(src)/__malidrv_build_info.c

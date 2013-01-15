@@ -32,6 +32,7 @@
 #if defined(CONFIG_MALI400_INTERNAL_PROFILING)
 #include <linux/slab.h>
 #include "mali_osk_profiling.h"
+#include "mali_profiling_events.h"
 #endif
 #include "mali_pm.h"
 #include "mali_group.h"

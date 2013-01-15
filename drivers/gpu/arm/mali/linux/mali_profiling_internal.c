@@ -16,6 +16,7 @@
 #include "mali_osk_profiling.h"
 #include "mali_user_settings_db.h"
 #include "mali_profiling_internal.h"
+#include "mali_profiling_events.h"
 
 typedef struct mali_profiling_entry
 {
