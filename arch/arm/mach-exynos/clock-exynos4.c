@@ -42,6 +42,7 @@ static struct sleep_save exynos4_clock_save[] = {
 	SAVE_ITEM(EXYNOS4_CLKSRC_CAM),
 	SAVE_ITEM(EXYNOS4_CLKSRC_TV),
 	SAVE_ITEM(EXYNOS4_CLKSRC_MFC),
+	SAVE_ITEM(EXYNOS4_CLKSRC_IMAGE),
 	SAVE_ITEM(EXYNOS4_CLKSRC_G3D),
 	SAVE_ITEM(EXYNOS4_CLKSRC_LCD0),
 	SAVE_ITEM(EXYNOS4_CLKSRC_MAUDIO),
@@ -80,6 +81,7 @@ static struct sleep_save exynos4_clock_save[] = {
 	SAVE_ITEM(EXYNOS4_CLKGATE_IP_MFC),
 	SAVE_ITEM(EXYNOS4_CLKGATE_IP_G3D),
 	SAVE_ITEM(EXYNOS4_CLKGATE_IP_LCD0),
+	SAVE_ITEM(EXYNOS4210_CLKGATE_IP_IMAGE),
 	SAVE_ITEM(EXYNOS4_CLKGATE_IP_FSYS),
 	SAVE_ITEM(EXYNOS4_CLKGATE_IP_GPS),
 	SAVE_ITEM(EXYNOS4_CLKGATE_IP_PERIL),
@@ -1668,6 +1670,7 @@ static struct clksrc_clk *exynos4_sysclks[] = {
 	&exynos4_clk_dout_mmc4,
 	&exynos4_clk_mout_mfc0,
 	&exynos4_clk_mout_mfc1,
+	&exynos4_clk_mout_g2d0,
 	&exynos4_clk_mout_g3d0,
 	&exynos4_clk_mout_g3d1,
 	&clk_sclk_audss,
@@ -1964,6 +1967,10 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
 		clk_set_parent(&exynos4_clksrcs[5+ptr].clk, &exynos4_clk_mout_mpll.clk);
 		clk_set_rate(&exynos4_clksrcs[5+ptr].clk, 166000000UL);
 	}
+
+	/* Hack for setting G2D clock */
+	clk_set_parent(&exynos4_clksrcs[10].clk, &exynos4_clk_mout_mpll.clk);
+	clk_set_rate(&exynos4_clksrcs[10].clk, 266000000UL);
 	
 	for (ptr = 0; ptr < ARRAY_SIZE(exynos4_clksrcs); ptr++)
 		s3c_set_clksrc(&exynos4_clksrcs[ptr], true);
