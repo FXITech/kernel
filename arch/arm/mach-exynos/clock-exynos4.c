@@ -617,6 +617,11 @@ static struct clk exynos4_init_clocks_off[] = {
 		.enable		= exynos4_clk_dac_ctrl,
 		.ctrlbit	= (1 << 0),
 	}, {
+		.name		= "sclk_cec",
+		.id		=  -1,
+		.enable		= exynos4_clk_ip_peril_ctrl,
+		.ctrlbit	= (1 << 11),
+	}, {
 		.name		= "adc",
 		.enable		= exynos4_clk_ip_peril_ctrl,
 		.ctrlbit	= (1 << 15),
