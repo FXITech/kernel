@@ -497,6 +497,9 @@ static struct i2c_board_info i2c1_devs[] __initdata = {
 	{
 		I2C_BOARD_INFO("alc5625", 0x1E),
 	},
+	{
+		I2C_BOARD_INFO("s5p_ddc", (0x74>>1)),
+	},
 };
 
 static struct s3c_sdhci_platdata fxi_c210_hsmmc3_pdata __initdata = {
