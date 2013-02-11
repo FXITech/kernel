@@ -26,20 +26,20 @@
 #include "hdmi_edid.h"
 #include "cec_priv.h"
 
-#define CEC_STATUS_TX_RUNNING       (1<<0)
-#define CEC_STATUS_TX_TRANSFERRING  (1<<1)
-#define CEC_STATUS_TX_DONE          (1<<2)
-#define CEC_STATUS_TX_ERROR         (1<<3)
-#define CEC_STATUS_TX_BYTES         (0xFF<<8)
-#define CEC_STATUS_RX_RUNNING       (1<<16)
-#define CEC_STATUS_RX_RECEIVING     (1<<17)
-#define CEC_STATUS_RX_DONE          (1<<18)
-#define CEC_STATUS_RX_ERROR         (1<<19)
-#define CEC_STATUS_RX_BCAST         (1<<20)
-#define CEC_STATUS_RX_BYTES         (0xFF<<24)
+#define CEC_STATUS_TX_RUNNING		(1<<0)
+#define CEC_STATUS_TX_TRANSFERRING	(1<<1)
+#define CEC_STATUS_TX_DONE		(1<<2)
+#define CEC_STATUS_TX_ERROR		(1<<3)
+#define CEC_STATUS_TX_BYTES		(0xFF<<8)
+#define CEC_STATUS_RX_RUNNING		(1<<16)
+#define CEC_STATUS_RX_RECEIVING		(1<<17)
+#define CEC_STATUS_RX_DONE		(1<<18)
+#define CEC_STATUS_RX_ERROR		(1<<19)
+#define CEC_STATUS_RX_BCAST		(1<<20)
+#define CEC_STATUS_RX_BYTES		(0xFF<<24)
 
-#define CEC_RX_BUFF_SIZE            16
-#define CEC_TX_BUFF_SIZE            16
+#define CEC_RX_BUFF_SIZE		16
+#define CEC_TX_BUFF_SIZE		16
 
 static u8 OSD_NAME[] = {
 	'F', 'X', 'I', ' ', 'c', 's', 't', 'i', 'c', 'k'
@@ -142,20 +142,20 @@ static DEFINE_MUTEX(cec_lock);
 static struct input_dev *hdmi_cec_event_dev;
 static struct workqueue_struct *hdmi_cec_event_wq;
 
-static struct delayed_work *cec_connect_work;
-
 static u32 mPaddr;
 static u32 mLaddr;
 static struct edid *gEdidData;
 static bool connected;
+static u8 connect_attempts = 0;
 static u32 lastKey;
 /* ...  */
 extern struct clk *hdmi_cec_clk;
 /* ...  */
+static void hdmi_cec_queue_connect (void);
 static void connect(void);
 static void hdmi_cec_event_wq_function(struct work_struct *work);
-static void hdmi_cec_init_wq_function(struct delayed_work *work);
-static void cec_alloc_laddr(void);
+static void hdmi_cec_init_wq_function(struct work_struct *work);
+static bool cec_alloc_laddr(void);
 static int cec_send_msg(u8 * buffer, int size);
 
 static void cec_broadcast_physical_address(void);
@@ -175,27 +175,15 @@ void hdmi_cec_start(void)
 		atomic_inc(&hdmi_on);
 
 	s5p_cec_reset();
-
 	s5p_cec_set_divider();
-
 	s5p_cec_threshold();
-
 	s5p_cec_unmask_tx_interrupts();
-
 	s5p_cec_set_rx_state(STATE_RX);
 	s5p_cec_unmask_rx_interrupts();
 	s5p_cec_enable_rx();
 
 	/* Initialise CEC */
-	if (cec_connect_work)
-		cancel_delayed_work_sync(cec_connect_work);
-
-	cec_connect_work = kmalloc(sizeof(struct delayed_work), GFP_KERNEL);
-	if (cec_connect_work) {
-		INIT_DELAYED_WORK(cec_connect_work, hdmi_cec_init_wq_function);
-		queue_delayed_work(hdmi_cec_event_wq, cec_connect_work,
-				   msecs_to_jiffies(9000));
-	}
+	hdmi_cec_queue_connect();
 
 no_multi_open:
 	mutex_unlock(&cec_lock);
@@ -212,17 +200,13 @@ void hdmi_cec_stop(void)
 	clk_put(hdmi_cec_clk);
 
 	connected = false;
+	connect_attempts = 0;
 	if (gEdidData) {
 		kfree(gEdidData);
 		gEdidData = NULL;
 	}
 	mLaddr = CEC_LADDR_UNREGISTERED;
 	mPaddr = CEC_NOT_VALID_PHYSICAL_ADDRESS;
-
-	if (cec_connect_work) {
-		cancel_delayed_work_sync(cec_connect_work);
-		kfree(cec_connect_work);
-	}
 
 	printk(KERN_INFO "hdmi_cec_event: CEC event handler stopped\n");
 }
@@ -233,6 +217,11 @@ void hdmi_cec_event_rx()
 	hdmi_cec_event_work_t *work = NULL;
 
 	spin_lock_irqsave(&cec_rx_struct.lock, spin_flags);
+	if (!connected) {
+		hdmi_cec_queue_connect();
+		goto irq_restore;
+	}
+
 	/* Post message with cec_rx_struct.buffer, cec_rx_struct.size */
 	work = (hdmi_cec_event_work_t *)
 		kmalloc(sizeof(hdmi_cec_event_work_t), GFP_KERNEL);
@@ -244,11 +233,13 @@ void hdmi_cec_event_rx()
 			  hdmi_cec_event_wq_function);
 		queue_work(hdmi_cec_event_wq, (struct work_struct *) work);
 	} else {
-		printk(KERN_ERR "hdmi_cec_event_rx: kmalloc on "
+		printk(KERN_ERR "hdmi_cec_event: kmalloc of "
 				"hdmi_cec_event_work_t failed\n");
 	}
 
 	s5p_cec_set_rx_state(STATE_RX);
+
+irq_restore:
 	spin_unlock_irqrestore(&cec_rx_struct.lock, spin_flags);
 }
 
@@ -258,10 +249,9 @@ static int cec_send_msg(u8 *buffer, int size)
 		return -1;
 	s5p_cec_copy_packet(buffer, size);
 	if (wait_event_interruptible(cec_tx_struct.waitq,
-				     atomic_read(&cec_tx_struct.state)
-				     != STATE_TX)) {
+			atomic_read(&cec_tx_struct.state) != STATE_TX)) {
 		printk(KERN_ERR
-		       "hdmi_cec_event: Error waiting on tx waitqueue\n");
+			"hdmi_cec_event: Error waiting on tx waitqueue\n");
 		return -ERESTARTSYS;
 	}
 
@@ -273,9 +263,25 @@ static int cec_send_msg(u8 *buffer, int size)
 	return size;
 }
 
-static void hdmi_cec_init_wq_function(struct delayed_work *work)
+static void hdmi_cec_queue_connect ()
 {
-	kfree((void *) work);
+	struct work_struct *work = NULL;
+
+	connect_attempts++;
+	if (connect_attempts < 6) {
+		printk(KERN_ERR "hdmi_cec_event: Trying to connect. Attempt #%d\n", connect_attempts);
+		work = kmalloc(sizeof(struct work_struct), GFP_KERNEL);
+		if (work) {
+			INIT_WORK(work, hdmi_cec_init_wq_function);
+			queue_work(hdmi_cec_event_wq, work);
+		}
+	}
+}
+
+static void hdmi_cec_init_wq_function(struct work_struct *work)
+{
+	kfree(work);
+
 	if (!connected)
 		connect();
 }
@@ -298,13 +304,11 @@ static void hdmi_cec_event_wq_function(struct work_struct *work)
 	opcode = w->buffer[1];
 	switch (opcode) {
 	case CEC_OPCODE_GIVE_PHYSICAL_ADDRESS:
-		printk(KERN_DEBUG
-		       "hdmi_cec_event: GIVE_PHYSICAL_ADDRESS\n");
+		printk(KERN_DEBUG "hdmi_cec_event: GIVE_PHYSICAL_ADDRESS\n");
 		cec_broadcast_physical_address();
 		break;
 	case CEC_OPCODE_REQUEST_ACTIVE_SOURCE:
-		printk(KERN_DEBUG
-		       "hdmi_cec_event: REQUEST_ACTIVE_SOURCE\n");
+		printk(KERN_DEBUG "hdmi_cec_event: REQUEST_ACTIVE_SOURCE\n");
 		cec_broadcast_active_source();
 		break;
 	case CEC_OPCODE_GET_CEC_VERSION:
@@ -313,15 +317,16 @@ static void hdmi_cec_event_wq_function(struct work_struct *work)
 		break;
 	case CEC_OPCODE_GIVE_DEVICE_POWER_STATUS:
 		{
+			u8 buf[3];
+
 			printk(KERN_DEBUG
 				"hdmi_cec_event: GIVE_DEVICE_POWER_STATUS\n");
-			u8 buf[3];
 			buf[0] = (mLaddr << 4) | ldst;
 			buf[1] = CEC_OPCODE_REPORT_POWER_STATUS;
 			buf[2] = CEC_POWER_STATUS_ON;
 			if (cec_send_msg(buf, 3) != 3) {
 				printk(KERN_ERR
-				       "hdmi_cec_event: Err GIVE_DEVICE_POWER_STATUS\n");
+					"hdmi_cec_event: Err GIVE_DEVICE_POWER_STATUS\n");
 			}
 		}
 		break;
@@ -331,42 +336,46 @@ static void hdmi_cec_event_wq_function(struct work_struct *work)
 		break;
 	case CEC_OPCODE_GIVE_OSD_NAME:
 		{
-			printk(KERN_DEBUG "hdmi_cec_event: GIVE_OSD_NAME\n");
 			int sz = ARRAY_SIZE(OSD_NAME);
 			u8 buf[2 + sz];
+
 			buf[0] = (mLaddr << 4) | ldst;
 			buf[1] = CEC_OPCODE_SET_OSD_NAME;
+
+			printk(KERN_DEBUG "hdmi_cec_event: GIVE_OSD_NAME\n");
 			memcpy(&buf[2], OSD_NAME, sz);
 
 			if (cec_send_msg(buf, 2 + sz) != (2 + sz)) {
 				printk(KERN_ERR
-				       "hdmi_cec_event: Err GIVE_OSD_NAME\n");
+					"hdmi_cec_event: Err GIVE_OSD_NAME\n");
 			}
 		}
 		break;
 	case CEC_OPCODE_MENU_REQUEST:
 		{
-			printk(KERN_DEBUG "hdmi_cec_event: MENU_REQUEST\n");
 			u8 buf[3];
+
+			printk(KERN_DEBUG "hdmi_cec_event: MENU_REQUEST\n");
 			buf[0] = (mLaddr << 4) | ldst;
 			buf[1] = CEC_OPCODE_MENU_STATUS;
 			buf[2] = 0;	/*menu_state */
 			if (cec_send_msg(buf, 3) != 3) {
 				printk(KERN_ERR
-				       "hdmi_cec_event: Err GET_CEC_VERSION\n");
+					"hdmi_cec_event: Err GET_CEC_VERSION\n");
 			}
 		}
 		break;
 	case CEC_OPCODE_USER_CONTROL_PRESSED:
 		{
+			u32 currKey = cec_key_table[w->buffer[2]];
+
 			printk(KERN_DEBUG
 				"hdmi_cec_event: USER_CONTROL_PRESSED 0x%x\n",
-				w->buffer[2]);
-			u32 currKey = cec_key_table[w->buffer[2]];
+				currKey);
 			if ((currKey > 0) && (currKey != lastKey)) {
 				lastKey = currKey;
-				input_event(hdmi_cec_event_dev, EV_KEY,
-					    currKey, 1);
+				input_event(hdmi_cec_event_dev,
+					EV_KEY, currKey, 1);
 				input_sync(hdmi_cec_event_dev);
 			}
 		}
@@ -376,8 +385,8 @@ static void hdmi_cec_event_wq_function(struct work_struct *work)
 			printk(KERN_DEBUG
 				"hdmi_cec_event: USER_CONTROL_RELEASED\n");
 			if (lastKey > 0) {
-				input_event(hdmi_cec_event_dev, EV_KEY,
-					    lastKey, 0);
+				input_event(hdmi_cec_event_dev,
+					EV_KEY, lastKey, 0);
 				input_sync(hdmi_cec_event_dev);
 			}
 			lastKey = 0;
@@ -387,17 +396,18 @@ static void hdmi_cec_event_wq_function(struct work_struct *work)
 	case CEC_OPCODE_FEATURE_ABORT:
 	default:
 		{
+			u8 buf[4];
+
 			printk(KERN_ERR
 				"hdmi_cec_event: Unimplemented opcode %x\n",
 				opcode);
-			u8 buf[4];
 			buf[0] = (mLaddr << 4) | ldst;
 			buf[1] = CEC_OPCODE_FEATURE_ABORT;
 			buf[2] = CEC_OPCODE_ABORT;
 			buf[3] = 0x04;	// "refused"
 			if (cec_send_msg(buf, 4) != 4) {
 				printk(KERN_ERR
-				       "hdmi_cec_event: Err CEC_OPCODE_FEATURE_ABORT\n");
+					"hdmi_cec_event: Err CEC_OPCODE_FEATURE_ABORT\n");
 			}
 		}
 		break;
@@ -425,24 +435,34 @@ static void connect(void)
 	mPaddr = 0;
 
 	for (i = 0; i < EDID_LENGTH - 4; i++) {
-		if ((cea[i] == 0x03) &&
-		    (cea[i + 1] == 0x0C) && (cea[i + 2] == 0x00)) {
+		if ((cea[i] == 0x03) && (cea[i + 1] == 0x0C) &&
+			(cea[i + 2] == 0x00)) {
 			mPaddr = cea[i + 3] << 8;
 			mPaddr |= cea[i + 4];
 		}
 	}
 
-	cec_alloc_laddr();
+	if (cec_alloc_laddr()) {
+		/* Initial broadcast for auto-detect */
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(msecs_to_jiffies(100));
+		cec_broadcast_physical_address();
+		cec_broadcast_active_source();
+		cec_broadcast_cec_version();
 
-	connected = true;
+		connected = true;
+	}
 }
 
-static void cec_alloc_laddr(void)
+static bool cec_alloc_laddr(void)
 {
 	int i = 0;
 
-	if (mPaddr == CEC_NOT_VALID_PHYSICAL_ADDRESS)
-		return;
+	if (mPaddr == CEC_NOT_VALID_PHYSICAL_ADDRESS) {
+		printk(KERN_ERR
+			"hdmi_cec_event: Invalid physical address!\n");
+		return false;
+	}
 
 	for (i = 0; i < ARRAY_SIZE(laddresses); i++) {
 		if (laddresses[i].devtype == CEC_DEVICE_PLAYER) {
@@ -457,21 +477,19 @@ static void cec_alloc_laddr(void)
 
 	if (mLaddr == CEC_LADDR_UNREGISTERED) {
 		printk(KERN_ERR
-		       "hdmi_cec_event: All logical addresses in use!\n");
-		return;
+			"hdmi_cec_event: All logical addresses in use!\n");
+		return false;
 	}
 
 	/* Set logical address on device */
 	s5p_cec_set_addr(mLaddr);
-
-	cec_broadcast_physical_address();
-	cec_broadcast_active_source();
-	cec_broadcast_cec_version();
+	return true;
 }
 
 static void cec_broadcast_physical_address(void)
 {
 	u8 buffer[5];
+
 	buffer[0] = (mLaddr << 4) | CEC_MSG_BROADCAST;
 	buffer[1] = CEC_OPCODE_REPORT_PHYSICAL_ADDRESS;
 	buffer[2] = (mPaddr >> 8) & 0xFF;
@@ -479,13 +497,14 @@ static void cec_broadcast_physical_address(void)
 	buffer[4] = CEC_DEVICE_PLAYER;
 	if (cec_send_msg(buffer, 5) != 5) {
 		printk(KERN_ERR
-		       "hdmi_cec_event: Err REPORT_PHYSICAL_ADDRESS\n");
+			"hdmi_cec_event: Err REPORT_PHYSICAL_ADDRESS\n");
 	}
 }
 
 static void cec_broadcast_active_source(void)
 {
 	u8 buf[4];
+
 	buf[0] = (mLaddr << 4) | CEC_MSG_BROADCAST;
 	buf[1] = CEC_OPCODE_ACTIVE_SOURCE;
 	buf[2] = (mPaddr >> 8) & 0xFF;
@@ -493,12 +512,12 @@ static void cec_broadcast_active_source(void)
 	if (cec_send_msg(buf, 4) != 4) {
 		printk(KERN_ERR "hdmi_cec_event: Err ACTIVE_SOURCE\n");
 	}
-
 }
 
 static void cec_broadcast_cec_version(void)
 {
 	u8 buf[3];
+
 	buf[0] = (mLaddr << 4) | CEC_MSG_BROADCAST;
 	buf[1] = CEC_OPCODE_CEC_VERSION;
 	/* 0x04 = v1.3a */
@@ -538,7 +557,7 @@ static int __init hdmi_cec_init(void)
 	ret = input_register_device(hdmi_cec_event_dev);
 	if (ret) {
 		printk(KERN_ERR
-		       "hdmi_cec_event: device register failed %d\n", ret);
+			"hdmi_cec_event: device register failed %d\n", ret);
 		ret = -1;
 		goto err_free_dev;
 	}
@@ -547,13 +566,12 @@ static int __init hdmi_cec_init(void)
 	gEdidData = NULL;
 	mLaddr = CEC_LADDR_UNREGISTERED;
 	mPaddr = CEC_NOT_VALID_PHYSICAL_ADDRESS;
-	hdmi_cec_event_wq =
-	    create_singlethread_workqueue("hdmi_cec_event_queue");
+	hdmi_cec_event_wq = create_singlethread_workqueue("hdmi_cec_event_queue");
 
-      err_free_dev:
+err_free_dev:
 	input_free_device(hdmi_cec_event_dev);
 
-      err_return:
+err_return:
 	return ret;
 }
 

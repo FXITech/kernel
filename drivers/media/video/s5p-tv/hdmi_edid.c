@@ -357,7 +357,7 @@ struct edid *hdmi_get_edid()
 	if (hdmi_probe_ddc(adapter))
 		edid = (struct edid *) hdmi_do_get_edid(adapter);
 	else
-		printk(KERN_ERR "DDC Adapter missing!\n");
+		printk(KERN_ERR "Couldn't fetch EDID from display!\n");
 	printk(KERN_DEBUG "End request EDID!\n");
 	return edid;
 }

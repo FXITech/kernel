@@ -22,7 +22,7 @@
 #ifndef _HDMI_EDID_H_
 #define _HDMI_EDID_H_ __FILE__
 
-struct edid *hdmi_get_edid();
+struct edid *hdmi_get_edid(void);
 u8 *hdmi_edid_find_cea_extension(struct edid *edid);
 
 #endif
