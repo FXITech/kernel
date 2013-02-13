@@ -77,6 +77,7 @@ struct g2d_frame def_frame = {
 	.bottom		= DEFAULT_HEIGHT,
 };
 
+
 struct g2d_fmt *find_fmt(struct v4l2_format *f)
 {
 	unsigned int i;
@@ -189,6 +190,10 @@ static int g2d_s_ctrl(struct v4l2_ctrl *ctrl)
 			ctx->rop = ROP4_COPY;
 		break;
 
+	case V4L2_CID_EXPOSURE:
+		ctx->fg_color = ctrl->val;
+		break;
+	  
 	case V4L2_CID_HFLIP:
 		ctx->flip = ctx->ctrl_hflip->val | (ctx->ctrl_vflip->val << 1);
 		break;
@@ -205,6 +210,11 @@ static const struct v4l2_ctrl_ops g2d_ctrl_ops = {
 int g2d_setup_ctrls(struct g2d_ctx *ctx)
 {
 	struct g2d_dev *dev = ctx->dev;
+	const u32 solid_col_id = V4L2_CID_EXPOSURE; /* for now */
+	const s32 solid_col_min = 0x80000000;
+	const s32 solid_col_max = 0x7fffffff;
+	const u32 solid_col_step = 1;
+	const s32 solid_col_default = 0;
 
 	v4l2_ctrl_handler_init(&ctx->ctrl_handler, 3);
 
@@ -221,6 +231,10 @@ int g2d_setup_ctrls(struct g2d_ctx *ctx)
 		V4L2_COLORFX_NEGATIVE,
 		~((1 << V4L2_COLORFX_NONE) | (1 << V4L2_COLORFX_NEGATIVE)),
 		V4L2_COLORFX_NONE);
+
+	v4l2_ctrl_new_std(&ctx->ctrl_handler, &g2d_ctrl_ops, solid_col_id,
+			  solid_col_min, solid_col_max, solid_col_step,
+			  solid_col_default);
 
 	if (ctx->ctrl_handler.error) {
 		int err = ctx->ctrl_handler.error;
@@ -396,6 +410,7 @@ static int vidioc_s_fmt(struct file *file, void *prv, struct v4l2_format *f)
 	frm->bottom	= frm->height;
 	frm->fmt	= fmt;
 	frm->stride	= f->fmt.pix.bytesperline;
+	ctx->source	= SRC_NORMAL;
 	return 0;
 }
 
@@ -579,8 +594,22 @@ static void device_run(void *prv)
 	g2d_set_dst_size(dev, &ctx->out);
 	g2d_set_dst_addr(dev, vb2_dma_contig_plane_dma_addr(dst, 0));
 
-	g2d_set_rop4(dev, ctx->rop);
 	g2d_set_flip(dev, ctx->flip);
+
+	/* We set blitting operation to solid if input width and
+	   height is specified to one pixel */
+	if (ctx->in.width == 1 && ctx->in.height == 1) {
+		g2d_select_src(dev, SRC_FG_COLOR);
+		g2d_set_fg_color(dev, ctx->fg_color);
+		g2d_set_third_operand(dev, (1 << 4) | 1);
+		ctx->rop = ROP4_PATTERN;
+	}
+	else {
+		ctx->rop = ROP4_COPY;
+		g2d_set_third_operand(dev, 0);
+		g2d_select_src(dev, SRC_NORMAL);
+	}
+	g2d_set_rop4(dev, ctx->rop);
 
 	if (ctx->in.c_width != ctx->out.c_width ||
 		ctx->in.c_height != ctx->out.c_height)

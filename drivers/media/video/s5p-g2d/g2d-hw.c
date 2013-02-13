@@ -77,6 +77,21 @@ void g2d_set_rop4(struct g2d_dev *d, u32 r)
 	w(r, ROP4_REG);
 }
 
+void g2d_select_src(struct g2d_dev *d, u32 r)
+{
+	w(r, SRC_SELECT_REG);
+}
+
+void g2d_set_fg_color(struct g2d_dev *d, u32 r)
+{
+	w(r, FG_COLOR_REG);
+}
+
+void g2d_set_third_operand(struct g2d_dev *d, u32 r)
+{
+	w(r, THIRD_OPERAND_REG);
+}
+
 void g2d_set_flip(struct g2d_dev *d, u32 r)
 {
 	w(r, SRC_MSK_DIRECT_REG);

@@ -103,6 +103,7 @@
 /* ROP4 operation values */
 #define ROP4_COPY		0xCCCC
 #define ROP4_INVERT		0x3333
+#define ROP4_PATTERN		0xF0F0
 
 /* Hardware limits */
 #define MAX_WIDTH		8000
