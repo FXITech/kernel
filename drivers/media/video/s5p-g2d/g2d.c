@@ -193,12 +193,50 @@ static int g2d_s_ctrl(struct v4l2_ctrl *ctrl)
 	case V4L2_CID_EXPOSURE:
 		ctx->fg_color = ctrl->val;
 		break;
-	  
-	case V4L2_CID_HFLIP:
-		ctx->flip = ctx->ctrl_hflip->val | (ctx->ctrl_vflip->val << 1);
-		break;
 
-	}
+	case V4L2_CID_HFLIP: {
+		const int xdir_mask = 1;
+		const int ydir_mask = 2;
+		const int dst_y_direction = ctx->dst_direction & ydir_mask;
+		const int dst_x_direction = ctx->dst_direction & xdir_mask;
+
+		/* we keep the src direction as is, and change the dst
+		   direction to the opposite of src if a flip is wanted */
+		if (ctx->ctrl_hflip->val) {
+			if ((ctx->src_direction & ydir_mask) ==
+			    dst_y_direction) {
+				if (dst_y_direction)
+					ctx->dst_direction &= ~ydir_mask;
+				else
+					ctx->dst_direction |= ydir_mask;
+			}
+		} else {
+			if (ctx->src_direction & ydir_mask)
+				ctx->dst_direction |= ydir_mask;
+			else
+				ctx->dst_direction &= ~ydir_mask;
+		}
+		if (ctx->ctrl_vflip->val) {
+			if ((ctx->src_direction & xdir_mask) ==
+			    dst_x_direction) {
+				if (dst_x_direction)
+					ctx->dst_direction &= ~(xdir_mask);
+				else
+					ctx->dst_direction |= xdir_mask;
+			}
+		} else {
+			if (ctx->src_direction & xdir_mask)
+				ctx->dst_direction |= xdir_mask;
+			else
+				ctx->dst_direction &= ~xdir_mask;
+		}
+	} break;
+
+	case V4L2_CID_GAIN:
+		ctx->src_direction = ctrl->val;
+		ctx->dst_direction = ctrl->val;
+		break;
+	};
 	spin_unlock_irqrestore(&ctx->dev->ctrl_lock, flags);
 	return 0;
 }
@@ -215,6 +253,11 @@ int g2d_setup_ctrls(struct g2d_ctx *ctx)
 	const s32 solid_col_max = 0x7fffffff;
 	const u32 solid_col_step = 1;
 	const s32 solid_col_default = 0;
+	const u32 direction_id = V4L2_CID_GAIN; /* for now */
+	const s32 direction_min = 0x80000000;
+	const s32 direction_max = 0x7fffffff;
+	const u32 direction_step = 1;
+	const s32 direction_default = 0;
 
 	v4l2_ctrl_handler_init(&ctx->ctrl_handler, 3);
 
@@ -235,6 +278,10 @@ int g2d_setup_ctrls(struct g2d_ctx *ctx)
 	v4l2_ctrl_new_std(&ctx->ctrl_handler, &g2d_ctrl_ops, solid_col_id,
 			  solid_col_min, solid_col_max, solid_col_step,
 			  solid_col_default);
+
+	v4l2_ctrl_new_std(&ctx->ctrl_handler, &g2d_ctrl_ops, direction_id,
+			  direction_min, direction_max, direction_step,
+			  direction_default);
 
 	if (ctx->ctrl_handler.error) {
 		int err = ctx->ctrl_handler.error;
@@ -594,7 +641,8 @@ static void device_run(void *prv)
 	g2d_set_dst_size(dev, &ctx->out);
 	g2d_set_dst_addr(dev, vb2_dma_contig_plane_dma_addr(dst, 0));
 
-	g2d_set_flip(dev, ctx->flip);
+	g2d_set_direction_src_and_mask(dev, ctx->src_direction);
+	g2d_set_direction_dst_and_pattern(dev, ctx->dst_direction);
 
 	/* We set blitting operation to solid if input width and
 	   height is specified to one pixel */

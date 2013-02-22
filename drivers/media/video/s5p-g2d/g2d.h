@@ -66,7 +66,8 @@ struct g2d_ctx {
 	struct v4l2_ctrl	*ctrl_vflip;
 	struct v4l2_ctrl_handler ctrl_handler;
 	u32 rop;
-	u32 flip;
+	u32 src_direction;
+	u32 dst_direction;
 	u32 source;
 	u32 fg_color;
 
@@ -88,9 +89,10 @@ void g2d_set_dst_addr(struct g2d_dev *d, dma_addr_t a);
 void g2d_start(struct g2d_dev *d);
 void g2d_clear_int(struct g2d_dev *d);
 void g2d_set_rop4(struct g2d_dev *d, u32 r);
-void g2d_set_flip(struct g2d_dev *d, u32 r);
 u32 g2d_cmd_stretch(u32 e);
 void g2d_set_cmd(struct g2d_dev *d, u32 c);
 void g2d_select_src(struct g2d_dev *d, u32 r);
 void g2d_set_fg_color(struct g2d_dev *d, u32 r);
 void g2d_set_third_operand(struct g2d_dev *d, u32 r);
+void g2d_set_direction_src_and_mask(struct g2d_dev *d, u32 r);
+void g2d_set_direction_dst_and_pattern(struct g2d_dev *d, u32 r);
