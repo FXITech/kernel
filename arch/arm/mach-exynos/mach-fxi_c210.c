@@ -47,9 +47,11 @@
 #include <plat/mfc.h>
 #include <plat/hdmi.h>
 #include <plat/otg.h>
+#include <plat/sysmmu.h>
 
 #include <mach/ohci.h>
 #include <mach/map.h>
+#include <mach/sysmmu.h>
 
 #include "common.h"
 
@@ -856,6 +858,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
   	&fxi_fxiid,
 	&fxi_mali_drm,
 	&ccandy_audio,
+	&exynos4_device_sysmmu
 };
 
 /* I2C module and id for HDMIPHY */
