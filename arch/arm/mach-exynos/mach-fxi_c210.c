@@ -951,6 +951,11 @@ static void __init fxi_c210_machine_init(void)
 	setup_power5v_gpio();
 	init_mali_gpu();
 
+#ifdef TEST_IOMMU_WITH_KERNEL_VIRT_ADDRESSES
+	sysmmu_clk_init(&s5p_device_g2d.dev, SYSMMU_G2D);
+	sysmmu_clk_enable(SYSMMU_G2D);
+#endif
+
 	platform_add_devices(fxi_c210_devices, ARRAY_SIZE(fxi_c210_devices));
 }
 

@@ -26,6 +26,9 @@
 #include <media/videobuf2-core.h>
 #include <media/videobuf2-dma-contig.h>
 
+#include <plat/sysmmu.h>
+#include <mach/sysmmu.h>
+
 #include "g2d.h"
 #include "g2d-regs.h"
 
@@ -624,6 +627,7 @@ static void device_run(void *prv)
 	struct vb2_buffer *src, *dst;
 	unsigned long flags;
 	u32 cmd = 0;
+	dma_addr_t dma_src, dma_dst;
 
 	dev->curr = ctx;
 
@@ -636,10 +640,23 @@ static void device_run(void *prv)
 	spin_lock_irqsave(&dev->ctrl_lock, flags);
 
 	g2d_set_src_size(dev, &ctx->in);
-	g2d_set_src_addr(dev, vb2_dma_contig_plane_dma_addr(src, 0));
-
 	g2d_set_dst_size(dev, &ctx->out);
-	g2d_set_dst_addr(dev, vb2_dma_contig_plane_dma_addr(dst, 0));
+
+	dma_src = vb2_dma_contig_plane_dma_addr(src, 0);
+	dma_dst = vb2_dma_contig_plane_dma_addr(dst, 0);
+
+#ifdef TEST_IOMMU_WITH_KERNEL_VIRT_ADDRESSES
+	{
+		unsigned long pgd;
+		pgd = (unsigned long ) init_mm.pgd;
+		s5p_sysmmu_set_tablebase_pgd(SYSMMU_G2D,
+					     (u32) virt_to_phys((void*) pgd));
+		dma_src = (dma_addr_t) phys_to_virt((unsigned long) dma_src);
+		dma_dst = (dma_addr_t) phys_to_virt((unsigned long) dma_dst);
+	}
+#endif
+	g2d_set_src_addr(dev, dma_src);
+	g2d_set_dst_addr(dev, dma_dst);
 
 	g2d_set_direction_src_and_mask(dev, ctx->src_direction);
 	g2d_set_direction_dst_and_pattern(dev, ctx->dst_direction);
@@ -663,6 +680,11 @@ static void device_run(void *prv)
 		ctx->in.c_height != ctx->out.c_height)
 		cmd |= g2d_cmd_stretch(1);
 	g2d_set_cmd(dev, cmd);
+
+#ifdef TEST_IOMMU_WITH_KERNEL_VIRT_ADDRESSES
+	s5p_sysmmu_enable(SYSMMU_G2D,
+			  (unsigned long) virt_to_phys((void*) init_mm.pgd));
+#endif
 	g2d_start(dev);
 
 	spin_unlock_irqrestore(&dev->ctrl_lock, flags);
