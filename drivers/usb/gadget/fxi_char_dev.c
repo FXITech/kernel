@@ -20,9 +20,6 @@
 
 #define DEVNAME "fxichardev"
 
-#define FXI_BLOCK_SIZE 512
-#define FXI_MAX_BLOCKS 128
-
 #define MAX_REQUESTS 128
 #define MAX_BUF_SIZE 4096
 
