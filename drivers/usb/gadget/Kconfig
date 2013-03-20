@@ -588,13 +588,13 @@ config USB_GADGET_SUPERSPEED
 	bool
 	depends on USB_GADGET_DUALSPEED
 
-config USB_FXI_CHAR_DEV
-	tristate "FXI Char device"
+config USB_COTTON_CANDY_ANYSCREEN
+	tristate "Cotton Candy Anyscreen support"
 	help
-          FXI char device
+          Adds support for the Cotton Candy Anyscreen
 
           Say "y" to link the driver statically, or "m" to build a
-          dynamically linked module called "fxichardev".
+          dynamically linked module called "ccanyscrn".
 
 #
 # USB Gadget Drivers

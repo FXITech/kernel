@@ -16,9 +16,9 @@
 #include <linux/completion.h>
 
 #include <linux/time.h>
-#include "fxi_char_dev.h"
+#include "ccanyscrn.h"
 
-#define DEVNAME "fxichardev"
+#define DEVNAME "ccanyscrn"
 
 #define MAX_REQUESTS 128
 #define MAX_BUF_SIZE 4096
