@@ -62,7 +62,7 @@ static int lastReq;
 static struct FxiRequest *currentRequest;
 
 /* current batch being served to USB host */
-static unsigned char batch[FXI_MAX_BLOCKS][FXI_BLOCK_SIZE];
+static unsigned char batch[CC_USB_MAX_BLOCKS][CC_USB_BLOCK_SIZE];
 static int batchSize;
 static int batchValid; /* batch is valid */
 static int batchBlockPointer; /* current batch block pointer */
@@ -175,7 +175,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 		dev_dbg(fxidev, "daemon connected\n");
 	}
 
-	if (type == FXIWRITE) {
+	if (type == CC_REQ_WRITE) {
 		while (size) {
 			struct FxiRequest *req;
 			int bytes = size;
@@ -206,7 +206,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			   (if this is longer than a single request) */
 			size -= bytes;
 			buf += bytes;
-			addr += bytes / FXI_BLOCK_SIZE;
+			addr += bytes / CC_USB_BLOCK_SIZE;
 
 			queueActivate();
 			mutex_unlock(&fxichardevmutex);
@@ -214,7 +214,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			INIT_COMPLETION(ready_for_new_requests);
 		}
 
-	} else { /* FXIREAD */
+	} else { /* CC_REQ_READ */
 		if ((addr >= outBlock1) && preload) {
 			if (impAck && (((addr >= outBlock2) && (curOutBlock == outBlock1)) ||
 				       ((addr < outBlock2) && (curOutBlock == outBlock2)))) {
@@ -230,7 +230,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 				req->addr = addr;
 				req->type = type;
 				req->buf = batch;
-				req->len = FXI_BLOCK_SIZE * FXI_MAX_BLOCKS;
+				req->len = CC_USB_BLOCK_SIZE * CC_USB_MAX_BLOCKS;
 				batchBlockPointer = 0;
 				queueActivate();
 				mutex_unlock (&fxichardevmutex);
@@ -239,7 +239,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 				batchValid = true;
 			}
 
-			memcpy(buf, nextBlock(size / FXI_BLOCK_SIZE), size);
+			memcpy(buf, nextBlock(size / CC_USB_BLOCK_SIZE), size);
 
 			if (*(uint32_t*)buf == 0) {
 				/* empty batch, need to fetch new batch next time */
@@ -298,7 +298,7 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 			unsigned long req[3];
 
 			if (!currentRequest) {
-				req[0] = FXINONE;
+				req[0] = CC_REQ_NONE;
 				req[1] = 0;
 				req[2] = 0;
 			} else {
@@ -354,14 +354,14 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 			      unsigned long arg)
 {
 	switch (cmd) {
-	case FXI_CHAR_DEV_IOCTL_READY: {
+	case CC_ANYSCREEN_IOCTL_READY: {
 		dev_dbg(fxidev, "waking up process\n");
 		daemonUp = true;
 		complete(&daemon_running);
 		break;
 	}
 
-	case FXI_CHAR_DEV_IOCTL_BLOCK_DONE: {
+	case CC_ANYSCREEN_IOCTL_BLOCK_DONE: {
 		dev_dbg(fxidev, "BLOCK_DONE\n");
 		queueRemove();
 		complete_all(&ready_for_new_requests);
@@ -372,37 +372,37 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		break;
 	}
 
-	case FXI_CHAR_DEV_IOCTL_IN:
+	case CC_ANYSCREEN_IOCTL_IN:
 		inBlock = arg;
 		dev_dbg(fxidev, "inblock: %x\n", inBlock);
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_OUT1:
+	case CC_ANYSCREEN_IOCTL_OUT1:
 		outBlock1 = arg;
 		dev_dbg(fxidev, "outblock1: %x\n", outBlock1);
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_OUT2:
+	case CC_ANYSCREEN_IOCTL_OUT2:
 		outBlock2 = arg;
 		dev_dbg(fxidev, "outblock2: %x\n", outBlock2);
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_PRELOAD:
+	case CC_ANYSCREEN_IOCTL_PRELOAD:
 		batchValid = false;
 		preload = true;
 		curOutBlock = outBlock1;
 		dev_dbg(fxidev, "starting preload mode\n");
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_BATCHSIZE:
+	case CC_ANYSCREEN_IOCTL_BATCHSIZE:
 		batchSize = arg;
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_IMPACK:
+	case CC_ANYSCREEN_IOCTL_IMPACK:
 		impAck = true;
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_HASDATA:
+	case CC_ANYSCREEN_IOCTL_HASDATA:
 		if (!currentRequest && queueSize()) {
 			mutex_lock (&fxichardevmutex);
 			currentRequest = queueFront();
@@ -416,7 +416,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 			return 0;
 		break;
 
-	case FXI_CHAR_DEV_IOCTL_DISABLE_POLL: {
+	case CC_ANYSCREEN_IOCTL_DISABLE_POLL: {
 		mutex_lock (&fxichardevmutex);
 		if (currentRequest || queueSize()) {
 			dev_dbg(fxidev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
