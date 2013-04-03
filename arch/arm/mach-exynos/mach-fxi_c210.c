@@ -812,7 +812,7 @@ static struct resource fxichardev_resource[] = {
 static u64 fxichardev_dma_mask = DMA_BIT_MASK(32);
 
 struct platform_device fxi_c210_device_chardev = {
-  .name   = "fxichardev",
+  .name   = "ccanyscrn",
   .id   = -1,
   .num_resources  = ARRAY_SIZE(fxichardev_resource),
   .resource = fxichardev_resource,
