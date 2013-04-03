@@ -46,7 +46,14 @@ struct FxiRequest {
 	void *writeBuf;
 };
 
-static struct device *fxidev;
+struct anyscreen {
+	struct device *dev;
+	struct miscdevice miscdev;
+};
+
+/* needed to access our private driver instance from the
+   exported fxi_request function */
+static struct anyscreen *anyscreen_global;
 
 static struct fasync_struct *fxiAsyncQueue;
 static atomic_t fxichardev_available = ATOMIC_INIT(1);
@@ -86,7 +93,7 @@ static int curOutBlock; /* set to either outBlock1 or outBlock2 */
 
 static DEFINE_MUTEX(fxichardevmutex);
 
-static int queueSize (void)
+static int queueSize(struct anyscreen *p)
 {
 	if (lastReq < 0)
 		return 0;
@@ -98,43 +105,43 @@ static int queueSize (void)
 		return lastReq + (MAX_REQUESTS - firstReq);
 }
 
-static struct FxiRequest *queueInsert (void)
+static struct FxiRequest *queueInsert(struct anyscreen *p)
 {
 	struct FxiRequest *req;
 
-	if (queueSize() >= MAX_REQUESTS)
+	if (queueSize(p) >= MAX_REQUESTS)
 		return NULL;
 
 	if (lastReq < 0)
 		lastReq = firstReq;
 
-	dev_dbg(fxidev, "insert %d (%d)\n", lastReq, queueSize() + 1);
+	dev_dbg(p->dev, "insert %d (%d)\n", lastReq, queueSize(p) + 1);
 	req = &requestQueue[lastReq];
 	lastReq = (lastReq + 1) % MAX_REQUESTS;
 	return req;
 }
 
-void queueActivate (void)
+void queueActivate(struct anyscreen *p)
 {
 	if (!polling) {
-		dev_dbg(fxidev, "send SIGIO, start poll\n");
+		dev_dbg(p->dev, "send SIGIO, start poll\n");
 		polling = true;
 		kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
 	}
 }
 
-static struct FxiRequest *queueFront (void)
+static struct FxiRequest *queueFront(struct anyscreen *p)
 {
 	struct FxiRequest *req;
-	dev_dbg(fxidev, "getting %d\n", firstReq);
+	dev_dbg(p->dev, "getting %d\n", firstReq);
 	req = &requestQueue[firstReq];
 	return req;
 }
 
-static void queueRemove (void)
+static void queueRemove(struct anyscreen *p)
 {
 	mutex_lock (&fxichardevmutex);
-	dev_dbg(fxidev, "remove %d\n", queueSize() - 1);
+	dev_dbg(p->dev, "remove %d\n", queueSize(p) - 1);
 	firstReq = (firstReq + 1) % MAX_REQUESTS;
 	if (firstReq == lastReq)
 		lastReq = -1; /* queue empty */
@@ -148,11 +155,12 @@ static inline void *nextBlock (int blocks)
 	return ptr;
 }
 
-static struct FxiRequest* get_request_wait(struct FxiRequest *req)
+static struct FxiRequest* get_request_wait(struct anyscreen *p,
+					   struct FxiRequest *req)
 {
 	for (;;) {
 		mutex_lock(&fxichardevmutex);
-		req = queueInsert();
+		req = queueInsert(p);
 		mutex_unlock(&fxichardevmutex);
 		if (req)
 			return req;
@@ -165,14 +173,15 @@ static struct FxiRequest* get_request_wait(struct FxiRequest *req)
    from the host */
 void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 {
-	dev_dbg(fxidev, "fxirequest %ld %ld %d (queue: %d) - %p\n",
-		type, addr, size, queueSize(), buf);
+	struct anyscreen *priv = anyscreen_global;
+	dev_dbg(priv->dev, "fxirequest %ld %ld %d (queue: %d) - %p\n",
+		type, addr, size, queueSize(priv), buf);
 
 	/* wait if fusionx daemon is not up yet */
 	if (!daemonUp) {
 		wait_for_completion(&daemon_running);
 		INIT_COMPLETION(daemon_running);
-		dev_dbg(fxidev, "daemon connected\n");
+		dev_dbg(priv->dev, "daemon connected\n");
 	}
 
 	if (type == CC_REQ_WRITE) {
@@ -184,7 +193,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			if (bytes > MAX_BUF_SIZE)
 				bytes = MAX_BUF_SIZE;
 
-			req = get_request_wait(req);
+			req = get_request_wait(priv, req);
 
 			 /* ACK, get new batch */
 			if ((addr >= inBlock) && (block[0] & ACK))
@@ -208,7 +217,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			buf += bytes;
 			addr += bytes / CC_USB_BLOCK_SIZE;
 
-			queueActivate();
+			queueActivate(priv);
 			mutex_unlock(&fxichardevmutex);
 			wait_for_completion(&ready_for_new_requests);
 			INIT_COMPLETION(ready_for_new_requests);
@@ -225,14 +234,14 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 
 			if (!batchValid) {
 				struct FxiRequest *req;
-				req = get_request_wait(req);
+				req = get_request_wait(priv, req);
 				mutex_lock(&fxichardevmutex);
 				req->addr = addr;
 				req->type = type;
 				req->buf = batch;
 				req->len = CC_USB_BLOCK_SIZE * CC_USB_MAX_BLOCKS;
 				batchBlockPointer = 0;
-				queueActivate();
+				queueActivate(priv);
 				mutex_unlock (&fxichardevmutex);
 				wait_for_completion(&ready_for_new_requests);
 				INIT_COMPLETION(ready_for_new_requests);
@@ -248,13 +257,13 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			}
 		} else {
 			struct FxiRequest *req;
-			req = get_request_wait(req);
+			req = get_request_wait(priv, req);
 			mutex_lock (&fxichardevmutex);
 			req->addr = addr;
 			req->type = type;
 			req->buf = buf;
 			req->len = size;
-			queueActivate();
+			queueActivate(priv);
 			mutex_unlock (&fxichardevmutex);
 			wait_for_completion(&ready_for_new_requests);
 			INIT_COMPLETION(ready_for_new_requests);
@@ -284,13 +293,14 @@ static int fxichardev_release (struct inode *inode, struct file *filp)
 static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 				size_t count, loff_t *f_pos)
 {
+	struct anyscreen *priv = filp->private_data;
 	switch (commandState) {
 	case COMMAND:
-		dev_dbg(fxidev, "read command %d\n", count);
+		dev_dbg(priv->dev, "read command %d\n", count);
 
-		if (!currentRequest && queueSize()) {
+		if (!currentRequest && queueSize(priv)) {
 			mutex_lock (&fxichardevmutex);
-			currentRequest = queueFront();
+			currentRequest = queueFront(priv);
 			mutex_unlock (&fxichardevmutex);
 		}
 
@@ -308,24 +318,24 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 			}
 
 			if (copy_to_user (buf, req, 3 * sizeof (unsigned long)) != 0)
-				dev_err(fxidev, "copy_to_user failed in %s\n", __func__);
+				dev_err(priv->dev, "copy_to_user failed in %s\n", __func__);
 
 			if (currentRequest)
 				commandState = DATA;
 		} else {
-			dev_err(fxidev, "Illegal read size: %d\n", count);
+			dev_err(priv->dev, "Illegal read size: %d\n", count);
 			return -EIO;
 		}
 		break;
 
 	case DATA:
-		dev_dbg(fxidev, "read data %d\n", count);
+		dev_dbg(priv->dev, "read data %d\n", count);
 
 		if (count > currentRequest->len)
 			count = currentRequest->len;
 
 		if (copy_to_user (buf, currentRequest->buf, count) != 0)
-			dev_err(fxidev, "copy_to_user failed in %s\n", __func__);
+			dev_err(priv->dev, "copy_to_user failed in %s\n", __func__);
 
 		currentRequest->buf += count;
 		currentRequest->len -= count;
@@ -337,13 +347,15 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 static ssize_t fxichardev_write (struct file *filp, const char __user *buf,
 				 size_t count, loff_t *f_pos)
 {
-	dev_dbg(fxidev, "write %d\n", count);
+
+	struct anyscreen *priv = filp->private_data;
+	dev_dbg(priv->dev, "write %d\n", count);
 
 	if (count > currentRequest->len)
 		count = currentRequest->len;
 
 	if (copy_from_user (currentRequest->buf, buf, count) != 0)
-		dev_err(fxidev, "copy_from_user failed in %s\n", __func__);
+		dev_err(priv->dev, "copy_from_user failed in %s\n", __func__);
 
 	currentRequest->buf += count;
 	currentRequest->len -= count;
@@ -353,17 +365,18 @@ static ssize_t fxichardev_write (struct file *filp, const char __user *buf,
 static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 			      unsigned long arg)
 {
+	struct anyscreen *priv = file->private_data;
 	switch (cmd) {
 	case CC_ANYSCREEN_IOCTL_READY: {
-		dev_dbg(fxidev, "waking up process\n");
+		dev_dbg(priv->dev, "waking up process\n");
 		daemonUp = true;
 		complete(&daemon_running);
 		break;
 	}
 
 	case CC_ANYSCREEN_IOCTL_BLOCK_DONE: {
-		dev_dbg(fxidev, "BLOCK_DONE\n");
-		queueRemove();
+		dev_dbg(priv->dev, "BLOCK_DONE\n");
+		queueRemove(priv);
 		complete_all(&ready_for_new_requests);
 		mutex_lock (&fxichardevmutex);
 		currentRequest = NULL;
@@ -374,24 +387,24 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 
 	case CC_ANYSCREEN_IOCTL_IN:
 		inBlock = arg;
-		dev_dbg(fxidev, "inblock: %x\n", inBlock);
+		dev_dbg(priv->dev, "inblock: %x\n", inBlock);
 		break;
 
 	case CC_ANYSCREEN_IOCTL_OUT1:
 		outBlock1 = arg;
-		dev_dbg(fxidev, "outblock1: %x\n", outBlock1);
+		dev_dbg(priv->dev, "outblock1: %x\n", outBlock1);
 		break;
 
 	case CC_ANYSCREEN_IOCTL_OUT2:
 		outBlock2 = arg;
-		dev_dbg(fxidev, "outblock2: %x\n", outBlock2);
+		dev_dbg(priv->dev, "outblock2: %x\n", outBlock2);
 		break;
 
 	case CC_ANYSCREEN_IOCTL_PRELOAD:
 		batchValid = false;
 		preload = true;
 		curOutBlock = outBlock1;
-		dev_dbg(fxidev, "starting preload mode\n");
+		dev_dbg(priv->dev, "starting preload mode\n");
 		break;
 
 	case CC_ANYSCREEN_IOCTL_BATCHSIZE:
@@ -403,9 +416,9 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		break;
 
 	case CC_ANYSCREEN_IOCTL_HASDATA:
-		if (!currentRequest && queueSize()) {
+		if (!currentRequest && queueSize(priv)) {
 			mutex_lock (&fxichardevmutex);
-			currentRequest = queueFront();
+			currentRequest = queueFront(priv);
 			commandState = COMMAND;
 			mutex_unlock (&fxichardevmutex);
 		}
@@ -418,20 +431,20 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 
 	case CC_ANYSCREEN_IOCTL_DISABLE_POLL: {
 		mutex_lock (&fxichardevmutex);
-		if (currentRequest || queueSize()) {
-			dev_dbg(fxidev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
+		if (currentRequest || queueSize(priv)) {
+			dev_dbg(priv->dev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
 			polling = true;
 			kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
 		} else {
 			polling = false;
-			dev_dbg(fxidev, "Inside DISABLE_POLL, stop poll\n");
+			dev_dbg(priv->dev, "Inside DISABLE_POLL, stop poll\n");
 		}
 		mutex_unlock (&fxichardevmutex);
 		break;
 	}
 
 	default:
-		dev_err(fxidev, "invalid ioctl code %d\n", cmd);
+		dev_err(priv->dev, "invalid ioctl code %d\n", cmd);
 		return -EIO;
 	}
 	return 0;
@@ -452,17 +465,24 @@ static struct file_operations fxichardev_fops = {
 	.unlocked_ioctl = fxichardev_ioctl,
 };
 
-static struct miscdevice md = {
- 	.minor = MISC_DYNAMIC_MINOR,
-	.name = DEVNAME,
-	.fops = &fxichardev_fops,
-};
-
 static int __devinit fxichardev_probe(struct platform_device *dev)
 {
 	int i, retval;
+	struct anyscreen *priv = kzalloc(sizeof(*priv), GFP_KERNEL);
+	if (!priv) {
+		dev_err(&dev->dev, "Failed to alloc anyscreen\n");
+		return -ENOMEM;
+	}
+
+	priv->miscdev.minor = MISC_DYNAMIC_MINOR;
+	priv->miscdev.name = DEVNAME;
+	priv->miscdev.fops = &fxichardev_fops;
+	dev_set_drvdata(&dev->dev, priv);
+	priv->dev = &dev->dev;
+	anyscreen_global = priv;
+
 	pr_warn(DEVNAME ": probe\n");
-	fxidev = &dev->dev;
+
 	impAck = false;
 	currentRequest = NULL;
 	fxiAsyncQueue = NULL;
@@ -482,13 +502,13 @@ static int __devinit fxichardev_probe(struct platform_device *dev)
 			goto fail_alloc;
 	}
 
-	retval = misc_register (&md);
+	retval = misc_register(&priv->miscdev);
 	if (retval)
 		goto fail_dev;
 	else
-		dev_err(fxidev, "misc minor: %d\n", md.minor);
+		dev_info(priv->dev, "misc minor: %d\n", priv->miscdev.minor);
 
-	dev_dbg(fxidev, "init done");
+	dev_info(priv->dev, "init done");
 	return 0;
 
 fail_dev:
@@ -503,16 +523,17 @@ fail_alloc:
 
 static int fxichardev_remove(struct platform_device *dev)
 {
-	misc_deregister (&md);
-	dev_dbg(fxidev, "%s called\n", __func__);
+	struct anyscreen *priv = dev_get_drvdata(&dev->dev);
+	misc_deregister(&priv->miscdev);
 	return 0;
 }
 
 static struct platform_driver fxichardev_driver = {
-	.probe	= fxichardev_probe,
+	.probe  = fxichardev_probe,
 	.remove = fxichardev_remove,
 	.driver = {
-		.name = "fxichardev",
+		.name = DEVNAME,
+		.owner = THIS_MODULE,
 	},
 };
 
@@ -521,15 +542,12 @@ static int __init fxichardev_init(void)
 	return platform_driver_register(&fxichardev_driver);
 }
 
-module_init(fxichardev_init);
-
-#ifdef MODULE
 static void __exit fxichardev_exit(void)
 {
 	platform_driver_unregister(&fxichardev_driver);
 }
 
-module_exit(fxichardev_exit);
 
+module_init(fxichardev_init);
+module_exit(fxichardev_exit);
 MODULE_LICENSE ("GPL");
-#endif
