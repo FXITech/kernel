@@ -32,8 +32,8 @@ enum PacketTypes {
 	ACK = 0x80
 };
 
-enum CommandStates {
-	COMMAND = 0,
+enum message_part {
+	HEADER = 0,
 	DATA
 };
 
@@ -51,6 +51,7 @@ struct anyscreen {
 	struct miscdevice miscdev;
 	struct mutex lock;
 	int disable_async_notification;
+	enum message_part message_part;
 };
 
 /* needed to access our private driver instance from the
@@ -59,8 +60,6 @@ static struct anyscreen *anyscreen_global;
 
 static struct fasync_struct *fxiAsyncQueue;
 static atomic_t fxichardev_available = ATOMIC_INIT(1);
-
-static int commandState;
 
 /* request queue (ringbuffer) */
 static struct FxiRequest requestQueue[MAX_REQUESTS];
@@ -293,9 +292,9 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 				size_t count, loff_t *f_pos)
 {
 	struct anyscreen *priv = filp->private_data;
-	switch (commandState) {
-	case COMMAND:
-		dev_dbg(priv->dev, "read command %d\n", count);
+	switch (priv->message_part) {
+	case HEADER:
+		dev_dbg(priv->dev, "read header %d\n", count);
 
 		if (!currentRequest && queueSize(priv)) {
 			mutex_lock(&priv->lock);
@@ -320,7 +319,7 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 				dev_err(priv->dev, "copy_to_user failed in %s\n", __func__);
 
 			if (currentRequest)
-				commandState = DATA;
+				priv->message_part = DATA;
 		} else {
 			dev_err(priv->dev, "Illegal read size: %d\n", count);
 			return -EIO;
@@ -379,7 +378,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		complete_all(&ready_for_new_requests);
 		mutex_lock(&priv->lock);
 		currentRequest = NULL;
-		commandState = COMMAND;
+		priv->message_part = HEADER;
 		mutex_unlock(&priv->lock);
 		break;
 	}
@@ -418,7 +417,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		if (!currentRequest && queueSize(priv)) {
 			mutex_lock(&priv->lock);
 			currentRequest = queueFront(priv);
-			commandState = COMMAND;
+			priv->message_part = HEADER;
 			mutex_unlock(&priv->lock);
 		}
 
