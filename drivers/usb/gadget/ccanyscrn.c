@@ -7,7 +7,8 @@
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 #include <linux/genhd.h>
-#include <linux/blkdev.h>
+#include <linux/uaccess.h>
+#include <linux/signal.h>
 #include <linux/hdreg.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
