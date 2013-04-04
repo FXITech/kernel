@@ -49,6 +49,7 @@ struct FxiRequest {
 struct anyscreen {
 	struct device *dev;
 	struct miscdevice miscdev;
+	struct mutex lock;
 	int disable_async_notification;
 };
 
@@ -90,8 +91,6 @@ static int outBlock2; /* address of outblock 2 */
 static int curOutBlock; /* set to either outBlock1 or outBlock2 */
 
 /* queue management */
-
-static DEFINE_MUTEX(fxichardevmutex);
 
 static int queueSize(struct anyscreen *p)
 {
@@ -140,12 +139,12 @@ static struct FxiRequest *queueFront(struct anyscreen *p)
 
 static void queueRemove(struct anyscreen *p)
 {
-	mutex_lock (&fxichardevmutex);
+	mutex_lock(&p->lock);
 	dev_dbg(p->dev, "remove %d\n", queueSize(p) - 1);
 	firstReq = (firstReq + 1) % MAX_REQUESTS;
 	if (firstReq == lastReq)
 		lastReq = -1; /* queue empty */
-	mutex_unlock (&fxichardevmutex);
+	mutex_unlock(&p->lock);
 }
 
 static inline void *nextBlock (int blocks)
@@ -159,9 +158,9 @@ static struct FxiRequest* get_request_wait(struct anyscreen *p,
 					   struct FxiRequest *req)
 {
 	for (;;) {
-		mutex_lock(&fxichardevmutex);
+		mutex_lock(&p->lock);
 		req = queueInsert(p);
-		mutex_unlock(&fxichardevmutex);
+		mutex_unlock(&p->lock);
 		if (req)
 			return req;
 		wait_for_completion(&ready_for_new_requests);
@@ -203,7 +202,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			if ((addr >= inBlock) && (block[0] == NACK))
 				batchValid = false;
 
-			mutex_lock(&fxichardevmutex);
+			mutex_lock(&priv->lock);
 			/* build request */
 			req->addr = addr;
 			req->type = type;
@@ -218,7 +217,7 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			addr += bytes / CC_USB_BLOCK_SIZE;
 
 			queueActivate(priv);
-			mutex_unlock(&fxichardevmutex);
+			mutex_unlock(&priv->lock);
 			wait_for_completion(&ready_for_new_requests);
 			INIT_COMPLETION(ready_for_new_requests);
 		}
@@ -235,14 +234,14 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			if (!batchValid) {
 				struct FxiRequest *req;
 				req = get_request_wait(priv, req);
-				mutex_lock(&fxichardevmutex);
+				mutex_lock(&priv->lock);
 				req->addr = addr;
 				req->type = type;
 				req->buf = batch;
 				req->len = CC_USB_BLOCK_SIZE * CC_USB_MAX_BLOCKS;
 				batchBlockPointer = 0;
 				queueActivate(priv);
-				mutex_unlock (&fxichardevmutex);
+				mutex_unlock (&priv->lock);
 				wait_for_completion(&ready_for_new_requests);
 				INIT_COMPLETION(ready_for_new_requests);
 				batchValid = true;
@@ -258,13 +257,13 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 		} else {
 			struct FxiRequest *req;
 			req = get_request_wait(priv, req);
-			mutex_lock (&fxichardevmutex);
+			mutex_lock (&priv->lock);
 			req->addr = addr;
 			req->type = type;
 			req->buf = buf;
 			req->len = size;
 			queueActivate(priv);
-			mutex_unlock (&fxichardevmutex);
+			mutex_unlock (&priv->lock);
 			wait_for_completion(&ready_for_new_requests);
 			INIT_COMPLETION(ready_for_new_requests);
 		}
@@ -299,9 +298,9 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 		dev_dbg(priv->dev, "read command %d\n", count);
 
 		if (!currentRequest && queueSize(priv)) {
-			mutex_lock (&fxichardevmutex);
+			mutex_lock(&priv->lock);
 			currentRequest = queueFront(priv);
-			mutex_unlock (&fxichardevmutex);
+			mutex_unlock(&priv->lock);
 		}
 
 		if (count == 3 * sizeof (unsigned long)) {
@@ -378,10 +377,10 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		dev_dbg(priv->dev, "BLOCK_DONE\n");
 		queueRemove(priv);
 		complete_all(&ready_for_new_requests);
-		mutex_lock (&fxichardevmutex);
+		mutex_lock(&priv->lock);
 		currentRequest = NULL;
 		commandState = COMMAND;
-		mutex_unlock (&fxichardevmutex);
+		mutex_unlock(&priv->lock);
 		break;
 	}
 
@@ -417,10 +416,10 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 
 	case CC_ANYSCREEN_IOCTL_HASDATA:
 		if (!currentRequest && queueSize(priv)) {
-			mutex_lock (&fxichardevmutex);
+			mutex_lock(&priv->lock);
 			currentRequest = queueFront(priv);
 			commandState = COMMAND;
-			mutex_unlock (&fxichardevmutex);
+			mutex_unlock(&priv->lock);
 		}
 
 		if (currentRequest)
@@ -430,7 +429,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		break;
 
 	case CC_ANYSCREEN_IOCTL_DISABLE_POLL: {
-		mutex_lock (&fxichardevmutex);
+		mutex_lock(&priv->lock);
 		if (currentRequest || queueSize(priv)) {
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
 			priv->disable_async_notification = true;
@@ -439,7 +438,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 			priv->disable_async_notification = false;
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, stop poll\n");
 		}
-		mutex_unlock (&fxichardevmutex);
+		mutex_unlock(&priv->lock);
 		break;
 	}
 
@@ -480,6 +479,7 @@ static int __devinit fxichardev_probe(struct platform_device *dev)
 	dev_set_drvdata(&dev->dev, priv);
 	priv->dev = &dev->dev;
 	anyscreen_global = priv;
+	mutex_init(&priv->lock);
 
 	pr_warn(DEVNAME ": probe\n");
 
