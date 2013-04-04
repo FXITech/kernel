@@ -49,6 +49,7 @@ struct FxiRequest {
 struct anyscreen {
 	struct device *dev;
 	struct miscdevice miscdev;
+	int disable_async_notification;
 };
 
 /* needed to access our private driver instance from the
@@ -81,7 +82,6 @@ static volatile int daemonUp = false; /* flags: user space daemon has started */
 static struct completion daemon_running;
 static struct completion ready_for_new_requests;
 
-static int polling;
 
 /* other configuration vars */
 static int inBlock; /* address of inblock */
@@ -123,9 +123,9 @@ static struct FxiRequest *queueInsert(struct anyscreen *p)
 
 void queueActivate(struct anyscreen *p)
 {
-	if (!polling) {
+	if (!p->disable_async_notification) {
 		dev_dbg(p->dev, "send SIGIO, start poll\n");
-		polling = true;
+		p->disable_async_notification = true;
 		kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
 	}
 }
@@ -433,10 +433,10 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		mutex_lock (&fxichardevmutex);
 		if (currentRequest || queueSize(priv)) {
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
-			polling = true;
+			priv->disable_async_notification = true;
 			kill_fasync (&fxiAsyncQueue, SIGIO, POLL_IN);
 		} else {
-			polling = false;
+			priv->disable_async_notification = false;
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, stop poll\n");
 		}
 		mutex_unlock (&fxichardevmutex);
@@ -489,7 +489,7 @@ static int __devinit fxichardev_probe(struct platform_device *dev)
 	batchValid = false;
 	preload = false;
 	daemonUp = false;
-	polling = false;
+	priv->disable_async_notification = false;
 	firstReq = 0;
 	lastReq = -1;
 
