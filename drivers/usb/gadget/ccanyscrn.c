@@ -52,7 +52,7 @@ struct anyscreen {
    exported fxi_request function */
 static struct anyscreen *anyscreen_global;
 
-static atomic_t fxichardev_available = ATOMIC_INIT(1);
+static atomic_t anyscreen_available = ATOMIC_INIT(1);
 
 /* request queue (ringbuffer) */
 static struct request request_queue[MAX_REQUESTS];
@@ -264,7 +264,7 @@ EXPORT_SYMBOL_GPL(fxi_request);
 
 /* fops */
 
-static int fxichardev_open (struct inode *inode, struct file *filp)
+static int anyscreen_open(struct inode *inode, struct file *filp)
 {
 	/* A miscdevice is a character device driver, but has some
 	   strange differences. During open the filp->private_data is
@@ -278,22 +278,22 @@ static int fxichardev_open (struct inode *inode, struct file *filp)
 	priv = container_of(filp->private_data, struct anyscreen, miscdev);
 	filp->private_data = priv;
 
-	if (!atomic_dec_and_test (&fxichardev_available)) {
+	if (!atomic_dec_and_test(&anyscreen_available)) {
 		/* already open, do not allow multiple opens */
-		atomic_inc (&fxichardev_available);
+		atomic_inc(&anyscreen_available);
 		return -EBUSY;
 	}
 	return 0;
 }
 
-static int fxichardev_release (struct inode *inode, struct file *filp)
+static int anyscreen_release(struct inode *inode, struct file *filp)
 {
-	atomic_inc (&fxichardev_available);
+	atomic_inc(&anyscreen_available);
 	return 0;
 }
 
-static ssize_t fxichardev_read (struct file *filp, char __user *buf,
-				size_t count, loff_t *f_pos)
+static ssize_t anyscreen_read(struct file *filp, char __user *buf,
+			       size_t count, loff_t *f_pos)
 {
 	struct anyscreen *priv = filp->private_data;
 	switch (priv->message_part) {
@@ -346,7 +346,7 @@ static ssize_t fxichardev_read (struct file *filp, char __user *buf,
 	return count;
 }
 
-static ssize_t fxichardev_write (struct file *filp, const char __user *buf,
+static ssize_t anyscreen_write(struct file *filp, const char __user *buf,
 				 size_t count, loff_t *f_pos)
 {
 
@@ -364,7 +364,7 @@ static ssize_t fxichardev_write (struct file *filp, const char __user *buf,
 	return count;
 }
 
-static long fxichardev_ioctl (struct file *file, unsigned int cmd,
+static long anyscreen_ioctl(struct file *file, unsigned int cmd,
 			      unsigned long arg)
 {
 	struct anyscreen *priv = file->private_data;
@@ -458,14 +458,14 @@ static int anyscreen_fasync (int fd, struct file *filp, int mode)
 	return fasync_helper(fd, filp, mode, &priv->async_queue);
 }
 
-static struct file_operations fxichardev_fops = {
+static struct file_operations anyscreen_fops = {
 	.owner = THIS_MODULE,
-	.open = fxichardev_open,
-	.read = fxichardev_read,
-	.write = fxichardev_write,
-	.release = fxichardev_release,
+	.open = anyscreen_open,
+	.read = anyscreen_read,
+	.write = anyscreen_write,
+	.release = anyscreen_release,
 	.fasync = anyscreen_fasync,
-	.unlocked_ioctl = fxichardev_ioctl,
+	.unlocked_ioctl = anyscreen_ioctl,
 };
 
 static int __devinit anyscreen_probe(struct platform_device *dev)
@@ -479,7 +479,7 @@ static int __devinit anyscreen_probe(struct platform_device *dev)
 
 	priv->miscdev.minor = MISC_DYNAMIC_MINOR;
 	priv->miscdev.name = DEVNAME;
-	priv->miscdev.fops = &fxichardev_fops;
+	priv->miscdev.fops = &anyscreen_fops;
 	dev_set_drvdata(&dev->dev, priv);
 	priv->dev = &dev->dev;
 	anyscreen_global = priv;
