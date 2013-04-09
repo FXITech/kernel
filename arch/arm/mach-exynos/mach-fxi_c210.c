@@ -806,20 +806,9 @@ static struct platform_device ccandy_audio = {
 	.id = -1,
 };
 
-static struct resource fxichardev_resource[] = {
-};
-
-static u64 fxichardev_dma_mask = DMA_BIT_MASK(32);
-
-struct platform_device fxi_c210_device_chardev = {
-  .name   = "ccanyscrn",
-  .id   = -1,
-  .num_resources  = ARRAY_SIZE(fxichardev_resource),
-  .resource = fxichardev_resource,
-  .dev    = {
-    .dma_mask   = &fxichardev_dma_mask,
-    .coherent_dma_mask  = DMA_BIT_MASK(32),
-  },
+struct platform_device anyscreen = {
+	.name   = "ccanyscrn",
+	.id   = -1,
 };
 
 static struct platform_device *fxi_c210_devices[] __initdata = {
@@ -831,7 +820,7 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
 	&s3c_device_rtc,
 	&s3c_device_wdt,
 	&s3c_device_usbgadget,
-	&fxi_c210_device_chardev,
+	&anyscreen,
 	&s5p_device_ehci,
 	&s5p_device_fimc0,
 	&s5p_device_fimc1,
