@@ -1,26 +1,17 @@
 #include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
-#include <linux/errno.h>
 #include <linux/types.h>
-#include <linux/vmalloc.h>
-#include <linux/genhd.h>
 #include <linux/uaccess.h>
 #include <linux/signal.h>
-#include <linux/hdreg.h>
 #include <linux/miscdevice.h>
 #include <linux/slab.h>
-#include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 #include <linux/completion.h>
-
-#include <linux/time.h>
 #include "ccanyscrn.h"
 
 #define DEVNAME "ccanyscrn"
-
 #define MAX_REQUESTS 128
 #define MAX_BUF_SIZE 4096
 
