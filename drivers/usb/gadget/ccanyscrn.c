@@ -263,6 +263,13 @@ EXPORT_SYMBOL_GPL(fxi_request);
 
 static int anyscreen_open(struct inode *inode, struct file *filp)
 {
+	struct anyscreen *priv;
+	if (!atomic_dec_and_test(&anyscreen_available)) {
+		/* already open, do not allow multiple opens */
+		atomic_inc(&anyscreen_available);
+		return -EBUSY;
+	}
+
 	/* A miscdevice is a character device driver, but has some
 	   strange differences. During open the filp->private_data is
 	   used to store the miscdevice instance itself rather that
@@ -271,15 +278,8 @@ static int anyscreen_open(struct inode *inode, struct file *filp)
 	   the actual private data (the struct anyscreen pointer), so
 	   we overwrite private_data with the containing anyscreen
 	   structure */
-	struct anyscreen *priv;
 	priv = container_of(filp->private_data, struct anyscreen, miscdev);
 	filp->private_data = priv;
-
-	if (!atomic_dec_and_test(&anyscreen_available)) {
-		/* already open, do not allow multiple opens */
-		atomic_inc(&anyscreen_available);
-		return -EBUSY;
-	}
 	return 0;
 }
 
