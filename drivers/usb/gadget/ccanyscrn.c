@@ -53,13 +53,14 @@ struct anyscreen {
 	struct mutex lock;
 	int disable_async_notification;
 	enum message_part message_part;
+	struct fasync_struct *async_queue;
+
 };
 
 /* needed to access our private driver instance from the
    exported fxi_request function */
 static struct anyscreen *anyscreen_global;
 
-static struct fasync_struct *fxi_async_queue;
 static atomic_t fxichardev_available = ATOMIC_INIT(1);
 
 /* request queue (ringbuffer) */
@@ -124,7 +125,7 @@ void queue_activate(struct anyscreen *p)
 	if (!p->disable_async_notification) {
 		dev_dbg(p->dev, "send SIGIO, start poll\n");
 		p->disable_async_notification = true;
-		kill_fasync (&fxi_async_queue, SIGIO, POLL_IN);
+		kill_fasync(&p->async_queue, SIGIO, POLL_IN);
 	}
 }
 
@@ -444,7 +445,7 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 		if (current_request || queue_size(priv)) {
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
 			priv->disable_async_notification = true;
-			kill_fasync (&fxi_async_queue, SIGIO, POLL_IN);
+			kill_fasync(&priv->async_queue, SIGIO, POLL_IN);
 		} else {
 			priv->disable_async_notification = false;
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, stop poll\n");
@@ -460,9 +461,10 @@ static long fxichardev_ioctl (struct file *file, unsigned int cmd,
 	return 0;
 }
 
-static int fxichardev_fasync (int fd, struct file *filp, int mode)
+static int anyscreen_fasync (int fd, struct file *filp, int mode)
 {
- 	return fasync_helper (fd, filp, mode, &fxi_async_queue);
+	struct anyscreen *priv = filp->private_data;
+	return fasync_helper(fd, filp, mode, &priv->async_queue);
 }
 
 static struct file_operations fxichardev_fops = {
@@ -471,7 +473,7 @@ static struct file_operations fxichardev_fops = {
 	.read = fxichardev_read,
 	.write = fxichardev_write,
 	.release = fxichardev_release,
-	.fasync = fxichardev_fasync,
+	.fasync = anyscreen_fasync,
 	.unlocked_ioctl = fxichardev_ioctl,
 };
 
@@ -496,7 +498,7 @@ static int __devinit anyscreen_probe(struct platform_device *dev)
 
 	imp_ack = false;
 	current_request = NULL;
-	fxi_async_queue = NULL;
+	priv->async_queue = NULL;
 	batch_valid = false;
 	preload = false;
 	daemon_up = false;
