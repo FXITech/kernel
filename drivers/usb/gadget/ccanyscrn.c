@@ -46,6 +46,31 @@ struct anyscreen {
 	enum message_part message_part;
 	struct fasync_struct *async_queue;
 
+	/* request queue (ringbuffer) */
+	struct request request_queue[MAX_REQUESTS];
+	int first_req;
+	int last_req;
+
+	struct request *current_request;
+
+	/* current batch being served to USB host */
+	unsigned char batch[CC_USB_MAX_BLOCKS][CC_USB_BLOCK_SIZE];
+	int batch_size;
+	int batch_valid; /* batch is valid */
+	int batch_block_pointer; /* current batch block pointer */
+
+	/* various flags */
+	int preload; /* flag: preload mode active */
+	int imp_ack; /* flag: ACK is done in driver (not user space) */
+	int daemon_up; /* flags: user space daemon has started */
+	struct completion daemon_running;
+	struct completion ready_for_new_requests;
+
+	/* other configuration vars */
+	int in_block; /* address of inblock */
+	int out_block1; /* address of outblock 1 */
+	int out_block2; /* address of outblock 2 */
+	int cur_out_block; /* set to either outBlock1 or outBlock2 */
 };
 
 /* needed to access our private driver instance from the
@@ -54,45 +79,17 @@ static struct anyscreen *anyscreen_global;
 
 static atomic_t anyscreen_available = ATOMIC_INIT(1);
 
-/* request queue (ringbuffer) */
-static struct request request_queue[MAX_REQUESTS];
-static int first_req;
-static int last_req;
-
-/* current request */
-static struct request *current_request;
-
-/* current batch being served to USB host */
-static unsigned char batch[CC_USB_MAX_BLOCKS][CC_USB_BLOCK_SIZE];
-static int batch_size;
-static int batch_valid; /* batch is valid */
-static int batch_block_pointer; /* current batch block pointer */
-
-/* various flags */
-static int preload; /* flag: preload mode active */
-static int imp_ack; /* flag: ACK is done in driver (not user space) */
-static volatile int daemon_up = false; /* flags: user space daemon has started */
-static struct completion daemon_running;
-static struct completion ready_for_new_requests;
-
-
-/* other configuration vars */
-static int in_block; /* address of inblock */
-static int out_block1; /* address of outblock 1 */
-static int out_block2; /* address of outblock 2 */
-static int cur_out_block; /* set to either outBlock1 or outBlock2 */
-
 /* queue management */
 static int queue_size(struct anyscreen *p)
 {
-	if (last_req < 0)
+	if (p->last_req < 0)
 		return 0;
-	else if (last_req == first_req)
+	else if (p->last_req == p->first_req)
 		return MAX_REQUESTS;
-	else if (last_req > first_req)
-		return last_req - first_req;
+	else if (p->last_req > p->first_req)
+		return p->last_req - p->first_req;
 	else
-		return last_req + (MAX_REQUESTS - first_req);
+		return p->last_req + (MAX_REQUESTS - p->first_req);
 }
 
 static struct request *queue_insert(struct anyscreen *p)
@@ -102,12 +99,12 @@ static struct request *queue_insert(struct anyscreen *p)
 	if (queue_size(p) >= MAX_REQUESTS)
 		return NULL;
 
-	if (last_req < 0)
-		last_req = first_req;
+	if (p->last_req < 0)
+		p->last_req = p->first_req;
 
-	dev_dbg(p->dev, "insert %d (%d)\n", last_req, queue_size(p) + 1);
-	req = &request_queue[last_req];
-	last_req = (last_req + 1) % MAX_REQUESTS;
+	dev_dbg(p->dev, "insert %d (%d)\n", p->last_req, queue_size(p) + 1);
+	req = &p->request_queue[p->last_req];
+	p->last_req = (p->last_req + 1) % MAX_REQUESTS;
 	return req;
 }
 
@@ -123,8 +120,8 @@ void queue_activate(struct anyscreen *p)
 static struct request *queue_front(struct anyscreen *p)
 {
 	struct request *req;
-	dev_dbg(p->dev, "getting %d\n", first_req);
-	req = &request_queue[first_req];
+	dev_dbg(p->dev, "getting %d\n", p->first_req);
+	req = &p->request_queue[p->first_req];
 	return req;
 }
 
@@ -132,16 +129,16 @@ static void queue_remove(struct anyscreen *p)
 {
 	mutex_lock(&p->lock);
 	dev_dbg(p->dev, "remove %d\n", queue_size(p) - 1);
-	first_req = (first_req + 1) % MAX_REQUESTS;
-	if (first_req == last_req)
-		last_req = -1; /* queue empty */
+	p->first_req = (p->first_req + 1) % MAX_REQUESTS;
+	if (p->first_req == p->last_req)
+		p->last_req = -1; /* queue empty */
 	mutex_unlock(&p->lock);
 }
 
-static inline void *next_block (int blocks)
+static inline void *next_block(struct anyscreen *p, int blocks)
 {
-	void *ptr = batch[batch_block_pointer % batch_size];
-	batch_block_pointer += blocks;
+	void *ptr = p->batch[p->batch_block_pointer % p->batch_size];
+	p->batch_block_pointer += blocks;
 	return ptr;
 }
 
@@ -154,8 +151,8 @@ static struct request* get_request_wait(struct anyscreen *p,
 		mutex_unlock(&p->lock);
 		if (req)
 			return req;
-		wait_for_completion(&ready_for_new_requests);
-		INIT_COMPLETION(ready_for_new_requests);
+		wait_for_completion(&p->ready_for_new_requests);
+		INIT_COMPLETION(p->ready_for_new_requests);
 	}
 }
 
@@ -168,9 +165,9 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 		type, addr, size, queue_size(priv), buf);
 
 	/* wait if fusionx daemon is not up yet */
-	if (!daemon_up) {
-		wait_for_completion(&daemon_running);
-		INIT_COMPLETION(daemon_running);
+	if (!priv->daemon_up) {
+		wait_for_completion(&priv->daemon_running);
+		INIT_COMPLETION(priv->daemon_running);
 		dev_dbg(priv->dev, "daemon connected\n");
 	}
 
@@ -186,12 +183,12 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			req = get_request_wait(priv, req);
 
 			/* ACK, get new batch */
-			if ((addr >= in_block) && (block[0] & ACK))
-				batch_valid = false;
+			if ((addr >= priv->in_block) && (block[0] & ACK))
+				priv->batch_valid = false;
 
 			/* NACK, get a previous batch */
-			if ((addr >= in_block) && (block[0] == NACK))
-				batch_valid = false;
+			if ((addr >= priv->in_block) && (block[0] == NACK))
+				priv->batch_valid = false;
 
 			mutex_lock(&priv->lock);
 			/* build request */
@@ -209,41 +206,41 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 
 			queue_activate(priv);
 			mutex_unlock(&priv->lock);
-			wait_for_completion(&ready_for_new_requests);
-			INIT_COMPLETION(ready_for_new_requests);
+			wait_for_completion(&priv->ready_for_new_requests);
+			INIT_COMPLETION(priv->ready_for_new_requests);
 		}
 
 	} else { /* CC_REQ_READ */
-		if ((addr >= out_block1) && preload) {
-			if (imp_ack && (((addr >= out_block2) && (cur_out_block == out_block1)) ||
-					((addr < out_block2) && (cur_out_block == out_block2)))) {
+		if ((addr >= priv->out_block1) && priv->preload) {
+			if (priv->imp_ack && (((addr >= priv->out_block2) && (priv->cur_out_block == priv->out_block1)) ||
+					((addr < priv->out_block2) && (priv->cur_out_block == priv->out_block2)))) {
 				/* implicit ACK, get new batch */
-				batch_valid = false;
-				cur_out_block = cur_out_block == out_block1 ? out_block2 : out_block1;
+				priv->batch_valid = false;
+				priv->cur_out_block = priv->cur_out_block == priv->out_block1 ? priv->out_block2 : priv->out_block1;
 			}
 
-			if (!batch_valid) {
+			if (!priv->batch_valid) {
 				struct request *req;
 				req = get_request_wait(priv, req);
 				mutex_lock(&priv->lock);
 				req->addr = addr;
 				req->type = type;
-				req->buf = batch;
+				req->buf = priv->batch;
 				req->len = CC_USB_BLOCK_SIZE * CC_USB_MAX_BLOCKS;
-				batch_block_pointer = 0;
+				priv->batch_block_pointer = 0;
 				queue_activate(priv);
 				mutex_unlock (&priv->lock);
-				wait_for_completion(&ready_for_new_requests);
-				INIT_COMPLETION(ready_for_new_requests);
-				batch_valid = true;
+				wait_for_completion(&priv->ready_for_new_requests);
+				INIT_COMPLETION(priv->ready_for_new_requests);
+				priv->batch_valid = true;
 			}
 
-			memcpy(buf, next_block(size / CC_USB_BLOCK_SIZE), size);
+			memcpy(buf, next_block(priv, size / CC_USB_BLOCK_SIZE), size);
 
 			if (*(uint32_t*)buf == 0) {
 				/* empty batch, need to fetch new batch next time */
-				batch_block_pointer = 0;
-				batch_valid = false;
+				priv->batch_block_pointer = 0;
+				priv->batch_valid = false;
 			}
 		} else {
 			struct request *req;
@@ -255,8 +252,8 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			req->len = size;
 			queue_activate(priv);
 			mutex_unlock (&priv->lock);
-			wait_for_completion(&ready_for_new_requests);
-			INIT_COMPLETION(ready_for_new_requests);
+			wait_for_completion(&priv->ready_for_new_requests);
+			INIT_COMPLETION(priv->ready_for_new_requests);
 		}
 	}
 }
@@ -300,29 +297,29 @@ static ssize_t anyscreen_read(struct file *filp, char __user *buf,
 	case HEADER:
 		dev_dbg(priv->dev, "read header %d\n", count);
 
-		if (!current_request && queue_size(priv)) {
+		if (!priv->current_request && queue_size(priv)) {
 			mutex_lock(&priv->lock);
-			current_request = queue_front(priv);
+			priv->current_request = queue_front(priv);
 			mutex_unlock(&priv->lock);
 		}
 
 		if (count == 3 * sizeof (unsigned long)) {
 			unsigned long req[3];
 
-			if (!current_request) {
+			if (!priv->current_request) {
 				req[0] = CC_REQ_NONE;
 				req[1] = 0;
 				req[2] = 0;
 			} else {
-				req[0] = current_request->type;
-				req[1] = current_request->addr;
-				req[2] = current_request->len;
+				req[0] = priv->current_request->type;
+				req[1] = priv->current_request->addr;
+				req[2] = priv->current_request->len;
 			}
 
 			if (copy_to_user(buf, req, 3 * sizeof (unsigned long)) != 0)
 				dev_err(priv->dev, "copy_to_user failed in %s\n", __func__);
 
-			if (current_request)
+			if (priv->current_request)
 				priv->message_part = DATA;
 		} else {
 			dev_err(priv->dev, "Illegal read size: %d\n", count);
@@ -333,14 +330,14 @@ static ssize_t anyscreen_read(struct file *filp, char __user *buf,
 	case DATA:
 		dev_dbg(priv->dev, "read data %d\n", count);
 
-		if (count > current_request->len)
-			count = current_request->len;
+		if (count > priv->current_request->len)
+			count = priv->current_request->len;
 
-		if (copy_to_user(buf, current_request->buf, count) != 0)
+		if (copy_to_user(buf, priv->current_request->buf, count) != 0)
 			dev_err(priv->dev, "copy_to_user failed in %s\n", __func__);
 
-		current_request->buf += count;
-		current_request->len -= count;
+		priv->current_request->buf += count;
+		priv->current_request->len -= count;
 		break;
 	}
 	return count;
@@ -353,14 +350,14 @@ static ssize_t anyscreen_write(struct file *filp, const char __user *buf,
 	struct anyscreen *priv = filp->private_data;
 	dev_dbg(priv->dev, "write %d\n", count);
 
-	if (count > current_request->len)
-		count = current_request->len;
+	if (count > priv->current_request->len)
+		count = priv->current_request->len;
 
-	if (copy_from_user(current_request->buf, buf, count) != 0)
+	if (copy_from_user(priv->current_request->buf, buf, count) != 0)
 		dev_err(priv->dev, "copy_from_user failed in %s\n", __func__);
 
-	current_request->buf += count;
-	current_request->len -= count;
+	priv->current_request->buf += count;
+	priv->current_request->len -= count;
 	return count;
 }
 
@@ -371,61 +368,61 @@ static long anyscreen_ioctl(struct file *file, unsigned int cmd,
 	switch (cmd) {
 	case CC_ANYSCREEN_IOCTL_READY: {
 		dev_dbg(priv->dev, "waking up process\n");
-		daemon_up = true;
-		complete(&daemon_running);
+		priv->daemon_up = true;
+		complete(&priv->daemon_running);
 		break;
 	}
 
 	case CC_ANYSCREEN_IOCTL_BLOCK_DONE: {
 		dev_dbg(priv->dev, "BLOCK_DONE\n");
 		queue_remove(priv);
-		complete_all(&ready_for_new_requests);
+		complete_all(&priv->ready_for_new_requests);
 		mutex_lock(&priv->lock);
-		current_request = NULL;
+		priv->current_request = NULL;
 		priv->message_part = HEADER;
 		mutex_unlock(&priv->lock);
 		break;
 	}
 
 	case CC_ANYSCREEN_IOCTL_IN:
-		in_block = arg;
-		dev_dbg(priv->dev, "inblock: %x\n", in_block);
+		priv->in_block = arg;
+		dev_dbg(priv->dev, "inblock: %x\n", priv->in_block);
 		break;
 
 	case CC_ANYSCREEN_IOCTL_OUT1:
-		out_block1 = arg;
-		dev_dbg(priv->dev, "outblock1: %x\n", out_block1);
+		priv->out_block1 = arg;
+		dev_dbg(priv->dev, "outblock1: %x\n", priv->out_block1);
 		break;
 
 	case CC_ANYSCREEN_IOCTL_OUT2:
-		out_block2 = arg;
-		dev_dbg(priv->dev, "outblock2: %x\n", out_block2);
+		priv->out_block2 = arg;
+		dev_dbg(priv->dev, "outblock2: %x\n", priv->out_block2);
 		break;
 
 	case CC_ANYSCREEN_IOCTL_PRELOAD:
-		batch_valid = false;
-		preload = true;
-		cur_out_block = out_block1;
+		priv->batch_valid = false;
+		priv->preload = true;
+		priv->cur_out_block = priv->out_block1;
 		dev_dbg(priv->dev, "starting preload mode\n");
 		break;
 
 	case CC_ANYSCREEN_IOCTL_BATCHSIZE:
-		batch_size = arg;
+		priv->batch_size = arg;
 		break;
 
 	case CC_ANYSCREEN_IOCTL_IMPACK:
-		imp_ack = true;
+		priv->imp_ack = true;
 		break;
 
 	case CC_ANYSCREEN_IOCTL_HASDATA:
-		if (!current_request && queue_size(priv)) {
+		if (!priv->current_request && queue_size(priv)) {
 			mutex_lock(&priv->lock);
-			current_request = queue_front(priv);
+			priv->current_request = queue_front(priv);
 			priv->message_part = HEADER;
 			mutex_unlock(&priv->lock);
 		}
 
-		if (current_request)
+		if (priv->current_request)
 			return 1;
 		else
 			return 0;
@@ -433,7 +430,7 @@ static long anyscreen_ioctl(struct file *file, unsigned int cmd,
 
 	case CC_ANYSCREEN_IOCTL_DISABLE_POLL: {
 		mutex_lock(&priv->lock);
-		if (current_request || queue_size(priv)) {
+		if (priv->current_request || queue_size(priv)) {
 			dev_dbg(priv->dev, "Inside DISABLE_POLL, send SIGIO, start poll\n");
 			priv->disable_async_notification = true;
 			kill_fasync(&priv->async_queue, SIGIO, POLL_IN);
@@ -487,22 +484,22 @@ static int __devinit anyscreen_probe(struct platform_device *dev)
 
 	pr_warn(DEVNAME ": probe\n");
 
-	imp_ack = false;
-	current_request = NULL;
+	priv->imp_ack = false;
+	priv->current_request = NULL;
 	priv->async_queue = NULL;
-	batch_valid = false;
-	preload = false;
-	daemon_up = false;
+	priv->batch_valid = false;
+	priv->preload = false;
+	priv->daemon_up = false;
 	priv->disable_async_notification = false;
-	first_req = 0;
-	last_req = -1;
+	priv->first_req = 0;
+	priv->last_req = -1;
 
-	init_completion(&daemon_running);
-	init_completion(&ready_for_new_requests);
+	init_completion(&priv->daemon_running);
+	init_completion(&priv->ready_for_new_requests);
 
 	for (i = 0; i < MAX_REQUESTS; i++) {
-		request_queue[i].write_buf = kmalloc (MAX_BUF_SIZE, GFP_KERNEL);
-		if (!request_queue[i].write_buf)
+		priv->request_queue[i].write_buf = kmalloc(MAX_BUF_SIZE, GFP_KERNEL);
+		if (!priv->request_queue[i].write_buf)
 			goto fail_alloc;
 	}
 
