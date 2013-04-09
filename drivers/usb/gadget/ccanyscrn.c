@@ -475,7 +475,7 @@ static struct file_operations fxichardev_fops = {
 	.unlocked_ioctl = fxichardev_ioctl,
 };
 
-static int __devinit fxichardev_probe(struct platform_device *dev)
+static int __devinit anyscreen_probe(struct platform_device *dev)
 {
 	int i, retval;
 	struct anyscreen *priv = kzalloc(sizeof(*priv), GFP_KERNEL);
@@ -532,33 +532,21 @@ fail_alloc:
 	return -ENODEV;
 }
 
-static int fxichardev_remove(struct platform_device *dev)
+static int anyscreen_remove(struct platform_device *dev)
 {
 	struct anyscreen *priv = dev_get_drvdata(&dev->dev);
 	misc_deregister(&priv->miscdev);
 	return 0;
 }
 
-static struct platform_driver fxichardev_driver = {
-	.probe  = fxichardev_probe,
-	.remove = fxichardev_remove,
+static struct platform_driver anyscreen_driver = {
+	.probe  = anyscreen_probe,
+	.remove = anyscreen_remove,
 	.driver = {
 		.name = DEVNAME,
 		.owner = THIS_MODULE,
 	},
 };
 
-static int __init fxichardev_init(void)
-{
-	return platform_driver_register(&fxichardev_driver);
-}
-
-static void __exit fxichardev_exit(void)
-{
-	platform_driver_unregister(&fxichardev_driver);
-}
-
-
-module_init(fxichardev_init);
-module_exit(fxichardev_exit);
+module_platform_driver(anyscreen_driver);
 MODULE_LICENSE ("GPL");
