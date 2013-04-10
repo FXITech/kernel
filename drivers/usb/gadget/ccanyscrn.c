@@ -63,8 +63,10 @@ struct anyscreen {
 	int preload; /* flag: preload mode active */
 	int imp_ack; /* flag: ACK is done in driver (not user space) */
 	int daemon_up; /* flags: user space daemon has started */
+	int abort;
 	struct completion daemon_running;
 	struct completion ready_for_new_requests;
+	struct completion shutdown;
 
 	/* other configuration vars */
 	int in_block; /* address of inblock */
@@ -78,6 +80,22 @@ struct anyscreen {
 static struct anyscreen *anyscreen_global;
 
 static atomic_t anyscreen_available = ATOMIC_INIT(1);
+
+static void anyscreen_reset(struct anyscreen *p)
+{
+	p->imp_ack = false;
+	p->current_request = NULL;
+	p->async_queue = NULL;
+	p->batch_valid = false;
+	p->preload = false;
+	p->daemon_up = false;
+	p->disable_async_notification = false;
+	p->first_req = 0;
+	p->last_req = -1;
+	p->abort = false;
+	p->message_part = HEADER;
+	dev_info(p->dev, "%s called\n", __func__);
+}
 
 /* queue management */
 static int queue_size(struct anyscreen *p)
@@ -142,6 +160,15 @@ static inline void *next_block(struct anyscreen *p, int blocks)
 	return ptr;
 }
 
+static int wait_for_user_to_complete_request(struct anyscreen *p)
+{
+	wait_for_completion(&p->ready_for_new_requests);
+	INIT_COMPLETION(p->ready_for_new_requests);
+	if (p->abort)
+		return -1;
+	return 0;
+}
+
 static struct request* get_request_wait(struct anyscreen *p)
 {
 	struct request *req;
@@ -151,9 +178,21 @@ static struct request* get_request_wait(struct anyscreen *p)
 		mutex_unlock(&p->lock);
 		if (req)
 			return req;
-		wait_for_completion(&p->ready_for_new_requests);
-		INIT_COMPLETION(p->ready_for_new_requests);
+		if (wait_for_user_to_complete_request(p) < 0)
+			return NULL;
 	}
+}
+
+static int wait_for_daemon_connected(struct anyscreen *p)
+{
+	if (!p->daemon_up) {
+		wait_for_completion(&p->daemon_running);
+		INIT_COMPLETION(p->daemon_running);
+		if (p->abort)
+			return -1;
+		dev_dbg(p->dev, "daemon connected\n");
+	}
+	return 0;
 }
 
 /* called by gadget driver whenever there is a request (read of write)
@@ -164,11 +203,15 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 	dev_dbg(priv->dev, "fxirequest %ld %ld %d (queue: %d) - %p\n",
 		type, addr, size, queue_size(priv), buf);
 
-	/* wait if fusionx daemon is not up yet */
-	if (!priv->daemon_up) {
-		wait_for_completion(&priv->daemon_running);
-		INIT_COMPLETION(priv->daemon_running);
-		dev_dbg(priv->dev, "daemon connected\n");
+	if (priv->abort) {
+		dev_info(priv->dev, "Abort flag detected, completing shutdown event\n");
+		complete(&priv->shutdown);
+		return -1;
+	}
+
+	if (wait_for_daemon_connected(priv) < 0) {
+		dev_info(priv->dev, "wait_for_daemon_connected returns due to abort\n");
+		return -1;
 	}
 
 	if (type == CC_REQ_WRITE) {
@@ -181,6 +224,11 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 				bytes = MAX_BUF_SIZE;
 
 			req = get_request_wait(priv);
+			if (!req) {
+				dev_info(priv->dev,
+					 "get_request_wait returned due to abort\n");
+				return -1;
+			}
 
 			/* ACK, get new batch */
 			if ((addr >= priv->in_block) && (block[0] & ACK))
@@ -206,8 +254,12 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 
 			queue_activate(priv);
 			mutex_unlock(&priv->lock);
-			wait_for_completion(&priv->ready_for_new_requests);
-			INIT_COMPLETION(priv->ready_for_new_requests);
+
+			if (wait_for_user_to_complete_request(priv) < 0) {
+				dev_info(priv->dev, "wait_for_user_to_complete_request "
+					 "returns due to abort\n");
+				return -1;
+			}
 		}
 
 	} else { /* CC_REQ_READ */
@@ -222,6 +274,12 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			if (!priv->batch_valid) {
 				struct request *req;
 				req = get_request_wait(priv);
+				if (!req) {
+					dev_info(priv->dev,
+						 "get_request_wait returned due to "
+						 "abort\n");
+					return -1;
+				}
 				mutex_lock(&priv->lock);
 				req->addr = addr;
 				req->type = type;
@@ -230,8 +288,14 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 				priv->batch_block_pointer = 0;
 				queue_activate(priv);
 				mutex_unlock (&priv->lock);
-				wait_for_completion(&priv->ready_for_new_requests);
-				INIT_COMPLETION(priv->ready_for_new_requests);
+
+				if (wait_for_user_to_complete_request(priv) < 0) {
+					dev_info(priv->dev,
+						 "wait_for_user_to_complete_request "
+						 "returns due to abort\n");
+					return -1;
+				}
+
 				priv->batch_valid = true;
 			}
 
@@ -245,6 +309,11 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 		} else {
 			struct request *req;
 			req = get_request_wait(priv);
+			if (!req) {
+				dev_info(priv->dev,
+					 "get_request_wait returned due to abort\n");
+				return -1;
+			}
 			mutex_lock (&priv->lock);
 			req->addr = addr;
 			req->type = type;
@@ -252,8 +321,13 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			req->len = size;
 			queue_activate(priv);
 			mutex_unlock (&priv->lock);
-			wait_for_completion(&priv->ready_for_new_requests);
-			INIT_COMPLETION(priv->ready_for_new_requests);
+
+			if (wait_for_user_to_complete_request(priv) < 0) {
+				dev_info(priv->dev,
+					 "wait_for_user_to_complete_request "
+					 "returns due to abort\n");
+				return -1;
+			}
 		}
 	}
 
@@ -269,6 +343,7 @@ static int anyscreen_open(struct inode *inode, struct file *filp)
 	if (!atomic_dec_and_test(&anyscreen_available)) {
 		/* already open, do not allow multiple opens */
 		atomic_inc(&anyscreen_available);
+		pr_info("canyscrn: Device already open, returning EBUSY\n");
 		return -EBUSY;
 	}
 
@@ -282,12 +357,29 @@ static int anyscreen_open(struct inode *inode, struct file *filp)
 	   structure */
 	priv = container_of(filp->private_data, struct anyscreen, miscdev);
 	filp->private_data = priv;
+	anyscreen_global = priv;
+	anyscreen_reset(priv);
+	dev_info(priv->dev, "%s called\n", __func__);
 	return 0;
 }
 
 static int anyscreen_release(struct inode *inode, struct file *filp)
 {
+	struct anyscreen *priv = filp->private_data;
+	dev_info(priv->dev, "%s", __func__);
 	atomic_inc(&anyscreen_available);
+
+	/* Announce that we're aborting */
+	priv->abort = true;
+
+	/* Complete pending wait_for_completions, if any */
+	complete_all(&priv->daemon_running);
+	complete_all(&priv->ready_for_new_requests);
+
+	dev_info(priv->dev, "Waiting for shutdown completion event ..\n");
+	wait_for_completion(&priv->shutdown);
+	INIT_COMPLETION(priv->shutdown);
+	dev_info(priv->dev, "Received shutdown event.\n");
 	return 0;
 }
 
@@ -467,6 +559,7 @@ static struct file_operations anyscreen_fops = {
 	.unlocked_ioctl = anyscreen_ioctl,
 };
 
+
 static int __devinit anyscreen_probe(struct platform_device *dev)
 {
 	int i, retval;
@@ -485,19 +578,10 @@ static int __devinit anyscreen_probe(struct platform_device *dev)
 	mutex_init(&priv->lock);
 
 	pr_warn(DEVNAME ": probe\n");
-
-	priv->imp_ack = false;
-	priv->current_request = NULL;
-	priv->async_queue = NULL;
-	priv->batch_valid = false;
-	priv->preload = false;
-	priv->daemon_up = false;
-	priv->disable_async_notification = false;
-	priv->first_req = 0;
-	priv->last_req = -1;
-
 	init_completion(&priv->daemon_running);
 	init_completion(&priv->ready_for_new_requests);
+	init_completion(&priv->shutdown);
+	anyscreen_reset(priv);
 
 	for (i = 0; i < MAX_REQUESTS; i++) {
 		priv->request_queue[i].write_buf = kmalloc(MAX_BUF_SIZE, GFP_KERNEL);
