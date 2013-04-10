@@ -158,7 +158,7 @@ static struct request* get_request_wait(struct anyscreen *p,
 
 /* called by gadget driver whenever there is a request (read of write)
    from the host */
-void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
+int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 {
 	struct anyscreen *priv = anyscreen_global;
 	dev_dbg(priv->dev, "fxirequest %ld %ld %d (queue: %d) - %p\n",
@@ -256,6 +256,8 @@ void fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			INIT_COMPLETION(priv->ready_for_new_requests);
 		}
 	}
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(fxi_request);
 

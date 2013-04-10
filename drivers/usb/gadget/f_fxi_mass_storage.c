@@ -297,7 +297,7 @@
 #include "gadget_chips.h"
 #include "../../../arch/arm/mach-exynos/fxi-fxiid.h"
 
-void fxi_request(unsigned long addr, void *buf, unsigned long type, int size);
+int fxi_request(unsigned long addr, void *buf, unsigned long type, int size);
 
 // TODO: make this to a module param
 #define FXI_DISK_SIZE (2 * 1024 * 1024 * 8 + 2 * 512)
@@ -796,7 +796,8 @@ static int do_read(struct fsg_common *common)
 		}
 
 		/* Perform the read */
-    fxi_request(lba, bh->buf, FXIREAD, amount);
+		if (fxi_request(lba, bh->buf, FXIREAD, amount) < 0)
+			return -EIO;
 
 		amount_left  -= amount;
 		common->residue -= amount;
@@ -940,7 +941,8 @@ static int do_write(struct fsg_common *common)
 				goto empty_write;
 
 			/* Perform the write */
-      fxi_request (lba, bh->buf, FXIWRITE, amount);
+			if (fxi_request(lba, bh->buf, FXIWRITE, amount) < 0)
+				return -EIO;
 
 			amount_left_to_write -= amount;
 			common->residue -= amount;
