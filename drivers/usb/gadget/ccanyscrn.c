@@ -142,9 +142,9 @@ static inline void *next_block(struct anyscreen *p, int blocks)
 	return ptr;
 }
 
-static struct request* get_request_wait(struct anyscreen *p,
-					struct request *req)
+static struct request* get_request_wait(struct anyscreen *p)
 {
+	struct request *req;
 	for (;;) {
 		mutex_lock(&p->lock);
 		req = queue_insert(p);
@@ -180,7 +180,7 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			if (bytes > MAX_BUF_SIZE)
 				bytes = MAX_BUF_SIZE;
 
-			req = get_request_wait(priv, req);
+			req = get_request_wait(priv);
 
 			/* ACK, get new batch */
 			if ((addr >= priv->in_block) && (block[0] & ACK))
@@ -221,7 +221,7 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 
 			if (!priv->batch_valid) {
 				struct request *req;
-				req = get_request_wait(priv, req);
+				req = get_request_wait(priv);
 				mutex_lock(&priv->lock);
 				req->addr = addr;
 				req->type = type;
@@ -244,7 +244,7 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 			}
 		} else {
 			struct request *req;
-			req = get_request_wait(priv, req);
+			req = get_request_wait(priv);
 			mutex_lock (&priv->lock);
 			req->addr = addr;
 			req->type = type;
