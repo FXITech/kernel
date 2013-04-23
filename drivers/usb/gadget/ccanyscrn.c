@@ -9,6 +9,7 @@
 #include <linux/slab.h>
 #include <linux/platform_device.h>
 #include <linux/completion.h>
+#include <linux/delay.h>
 #include "ccanyscrn.h"
 
 #define DEVNAME "ccanyscrn"
@@ -83,6 +84,7 @@ static atomic_t anyscreen_available = ATOMIC_INIT(1);
 
 static void anyscreen_reset(struct anyscreen *p)
 {
+	mutex_lock(&p->lock);
 	p->imp_ack = false;
 	p->current_request = NULL;
 	p->async_queue = NULL;
@@ -94,6 +96,7 @@ static void anyscreen_reset(struct anyscreen *p)
 	p->last_req = -1;
 	p->abort = false;
 	p->message_part = HEADER;
+	mutex_unlock(&p->lock);
 	dev_info(p->dev, "%s called\n", __func__);
 }
 
@@ -203,11 +206,13 @@ int fxi_request (unsigned long addr, void *buf, unsigned long type, int size)
 	dev_dbg(priv->dev, "fxirequest %ld %ld %d (queue: %d) - %p\n",
 		type, addr, size, queue_size(priv), buf);
 
+	mutex_lock(&priv->lock);
 	if (priv->abort) {
 		dev_info(priv->dev, "Abort flag detected, completing shutdown event\n");
-		complete(&priv->shutdown);
+		complete_all(&priv->shutdown);
 		return -1;
 	}
+	mutex_unlock(&priv->lock);
 
 	if (wait_for_daemon_connected(priv) < 0) {
 		dev_info(priv->dev, "wait_for_daemon_connected returns due to abort\n");
@@ -364,19 +369,22 @@ static int anyscreen_open(struct inode *inode, struct file *filp)
 
 static int anyscreen_release(struct inode *inode, struct file *filp)
 {
+	const unsigned long jiffs = 10;
 	struct anyscreen *priv = filp->private_data;
 	dev_info(priv->dev, "%s", __func__);
 	atomic_inc(&anyscreen_available);
 
 	/* Announce that we're aborting */
+	mutex_lock(&priv->lock);
 	priv->abort = true;
 
 	/* Complete pending wait_for_completions, if any */
 	complete_all(&priv->daemon_running);
 	complete_all(&priv->ready_for_new_requests);
+	mutex_unlock(&priv->lock);
 
 	dev_info(priv->dev, "Waiting for shutdown completion event ..\n");
-	wait_for_completion(&priv->shutdown);
+	wait_for_completion_timeout(&priv->shutdown, jiffs);
 	INIT_COMPLETION(priv->shutdown);
 	dev_info(priv->dev, "Received shutdown event.\n");
 	anyscreen_reset(priv);
