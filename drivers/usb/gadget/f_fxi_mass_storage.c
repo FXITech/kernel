@@ -748,6 +748,7 @@ static int do_read(struct fsg_common *common)
 	int			rc;
 	u32			amount_left;
 	unsigned int		amount;
+	loff_t file_offset;
 
 	/*
 	 * Get the starting Logical Block Address and check that it's
@@ -773,12 +774,15 @@ static int do_read(struct fsg_common *common)
 		return -EINVAL;
 	}
 
+	file_offset = ((loff_t) lba) << curlun->blkbits;
+
 	/* Carry out the file reads */
 	amount_left = common->data_size_from_cmnd;
 	if (unlikely(amount_left == 0))
 		return -EIO;		/* No default reply */
 
 	for (;;) {
+		int ret;
 		/*
 		 * Figure out how much we need to read:
 		 * Try to read the remaining amount.
@@ -796,8 +800,17 @@ static int do_read(struct fsg_common *common)
 		}
 
 		/* Perform the read */
-		if (fxi_request(lba, bh->buf, FXIREAD, amount) < 0)
-			return -EIO;
+		ret = fxi_request(lba, bh->buf, FXIREAD, amount);
+
+		if (signal_pending(current))
+			return -EINTR;
+
+		if (ret < 0) {
+			curlun->sense_data = SS_UNRECOVERED_READ_ERROR;
+			curlun->sense_data_info = file_offset >> curlun->blkbits;
+			curlun->info_valid = 1;
+			break;
+		}
 
 		amount_left  -= amount;
 		common->residue -= amount;
@@ -878,6 +891,7 @@ static int do_write(struct fsg_common *common)
 	amount_left_to_write = common->data_size_from_cmnd;
 
 	while (amount_left_to_write > 0) {
+		int ret;
 
 		/* Queue a request for more data from the host */
 		bh = common->next_buffhd_to_fill;
@@ -941,8 +955,17 @@ static int do_write(struct fsg_common *common)
 				goto empty_write;
 
 			/* Perform the write */
-			if (fxi_request(lba, bh->buf, FXIWRITE, amount) < 0)
-				return -EIO;
+			ret = fxi_request(lba, bh->buf, FXIWRITE, amount);
+
+			if (signal_pending(current))
+				return -EINTR;
+
+			if (ret < 0) {
+				curlun->sense_data = SS_WRITE_ERROR;
+				curlun->sense_data_info = file_offset >> curlun->blkbits;
+				curlun->info_valid = 1;
+				break;
+			}
 
 			amount_left_to_write -= amount;
 			common->residue -= amount;
