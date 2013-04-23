@@ -358,7 +358,6 @@ static int anyscreen_open(struct inode *inode, struct file *filp)
 	priv = container_of(filp->private_data, struct anyscreen, miscdev);
 	filp->private_data = priv;
 	anyscreen_global = priv;
-	anyscreen_reset(priv);
 	dev_info(priv->dev, "%s called\n", __func__);
 	return 0;
 }
@@ -380,6 +379,7 @@ static int anyscreen_release(struct inode *inode, struct file *filp)
 	wait_for_completion(&priv->shutdown);
 	INIT_COMPLETION(priv->shutdown);
 	dev_info(priv->dev, "Received shutdown event.\n");
+	anyscreen_reset(priv);
 	return 0;
 }
 
