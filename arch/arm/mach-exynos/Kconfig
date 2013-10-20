@@ -301,6 +301,7 @@ config MACH_FXI_C210
   	select S5P_DEV_I2C_HDMIPHY
   	select S5P_DEV_MFC
   	select S5P_DEV_TV
+	select S5P_DEV_JPEG
   	select S5P_DEV_USB_EHCI
 	select S5P_DEV_USB_HSDEVICE
   	select SAMSUNG_DEV_PWM

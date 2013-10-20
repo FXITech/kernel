@@ -847,7 +847,8 @@ static struct platform_device *fxi_c210_devices[] __initdata = {
   	&fxi_fxiid,
 	&fxi_mali_drm,
 	&ccandy_audio,
-	&exynos4_device_sysmmu
+	&exynos4_device_sysmmu,
+	&s5p_device_jpeg,
 };
 
 /* I2C module and id for HDMIPHY */
