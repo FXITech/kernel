@@ -327,6 +327,11 @@ static int vidioc_g_fmt(struct file *file, void *priv, struct v4l2_format *f)
 		/* This is run on OUTPUT
 		   The buffer contains compressed image
 		   so width and height have no meaning */
+		if (!ctx->src_fmt) {
+			mfc_err("Source format is unset. "
+				"Please call _s_fmt before calling _g_fmt.");
+			return -EINVAL;
+		}
 		pix_mp->width = 0;
 		pix_mp->height = 0;
 		pix_mp->field = V4L2_FIELD_NONE;
