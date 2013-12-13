@@ -255,41 +255,67 @@ static int mxr_enum_fmt(struct file *file, void  *priv,
 	return 0;
 }
 
-static unsigned int divup(unsigned int divident, unsigned int divisor)
+unsigned long mxr_get_luma_size(u32 fourcc, unsigned int width,
+	unsigned int height)
 {
-	return (divident + divisor - 1) / divisor;
-}
+	unsigned long size;
 
-unsigned long mxr_get_plane_size(const struct mxr_block *blk,
-	unsigned int width, unsigned int height)
-{
-	unsigned int bl_width = divup(width, blk->width);
-	unsigned int bl_height = divup(height, blk->height);
+	switch (fourcc) {
+	case V4L2_PIX_FMT_NV12:
+	case V4L2_PIX_FMT_NV21:
+	case V4L2_PIX_FMT_NV12M:
+		size = ALIGN(width, 4) * ALIGN(height, 2);
+		break;
+	case V4L2_PIX_FMT_NV12MT:
+		size = ALIGN(width, 128) * ALIGN(height, 32);
+		break;
+	default:
+		size = 0;
+		break;
+	}
 
-	return bl_width * bl_height * blk->size;
+	return size;
 }
 
 static void mxr_mplane_fill(struct v4l2_plane_pix_format *planes,
 	const struct mxr_format *fmt, u32 width, u32 height)
 {
-	int i;
-
 	/* checking if nothing to fill */
 	if (!planes)
 		return;
 
-	memset(planes, 0, sizeof(*planes) * fmt->num_subframes);
-	for (i = 0; i < fmt->num_planes; ++i) {
-		struct v4l2_plane_pix_format *plane = planes
-			+ fmt->plane2subframe[i];
-		const struct mxr_block *blk = &fmt->plane[i];
-		u32 bl_width = divup(width, blk->width);
-		u32 bl_height = divup(height, blk->height);
-		u32 sizeimage = bl_width * bl_height * blk->size;
-		u16 bytesperline = bl_width * blk->size / blk->height;
+	switch (fmt->fourcc) {
+	case V4L2_PIX_FMT_NV12:
+	case V4L2_PIX_FMT_NV21:
+	case V4L2_PIX_FMT_NV12M:
+		planes[0].bytesperline = ALIGN(width, 4);
+		planes[0].sizeimage = planes[0].bytesperline * ALIGN(height, 2);
 
-		plane->sizeimage += sizeimage;
-		plane->bytesperline = max(plane->bytesperline, bytesperline);
+		if (fmt->num_subframes == 2) {
+			planes[1].bytesperline = planes[0].bytesperline;
+			planes[1].sizeimage = planes[0].sizeimage >> 1;
+		} else {
+			planes[0].sizeimage += planes[0].sizeimage >> 1;
+		}
+		break;
+	case V4L2_PIX_FMT_NV12MT:
+		planes[0].bytesperline = ALIGN(width, 128);
+		planes[1].bytesperline = planes[0].bytesperline;
+		planes[0].sizeimage = planes[0].bytesperline *
+			ALIGN(height, 32);
+		planes[1].sizeimage = planes[1].bytesperline *
+			(ALIGN(height, 64) >> 1);
+		break;
+	case V4L2_PIX_FMT_RGB565:
+	case V4L2_PIX_FMT_RGB555:
+	case V4L2_PIX_FMT_RGB444:
+		planes[0].bytesperline = ALIGN(width * 2, 4);
+		planes[0].sizeimage = planes[0].bytesperline * height;
+		break;
+	case V4L2_PIX_FMT_BGR32:
+		planes[0].bytesperline = width * 4;
+		planes[0].sizeimage = planes[0].bytesperline * height;
+		break;
 	}
 }
 
@@ -306,9 +332,8 @@ static int mxr_g_fmt(struct file *file, void *priv,
 	pix->field = V4L2_FIELD_NONE;
 	pix->pixelformat = layer->fmt->fourcc;
 	pix->colorspace = layer->fmt->colorspace;
+	pix->num_planes = layer->fmt->num_subframes;
 	mxr_mplane_fill(pix->plane_fmt, layer->fmt, pix->width, pix->height);
-
-	f->fmt.pix_mp.plane_fmt[0].sizeimage = f->fmt.pix.width * f->fmt.pix.height * 2;
 
 	return 0;
 }
@@ -836,6 +861,16 @@ static const struct v4l2_file_operations mxr_fops = {
 	.unlocked_ioctl = video_ioctl2,
 };
 
+static void mxr_planes_dump(struct mxr_device *mdev, int num,
+	struct v4l2_plane_pix_format planes[3]) {
+	int i;
+	for (i = 0; i < num; i++) {
+		mxr_dbg(mdev, "Plane %d:\n", i);
+		mxr_dbg(mdev, "\tbytesperline: %d\n", planes[i].bytesperline);
+		mxr_dbg(mdev, "\tsizeimage: %d\n", planes[i].sizeimage);
+	}
+}
+
 static int queue_setup(struct vb2_queue *vq, const struct v4l2_format *pfmt,
 	unsigned int *nbuffers, unsigned int *nplanes, unsigned int sizes[],
 	void *alloc_ctxs[])
@@ -853,6 +888,8 @@ static int queue_setup(struct vb2_queue *vq, const struct v4l2_format *pfmt,
 	mxr_dbg(mdev, "fmt = %s\n", fmt->name);
 	mxr_mplane_fill(planes, fmt, layer->geo.src.full_width,
 		layer->geo.src.full_height);
+
+	mxr_planes_dump(layer->mdev, fmt->num_subframes, planes);
 
 	*nplanes = fmt->num_subframes;
 	for (i = 0; i < fmt->num_subframes; ++i) {

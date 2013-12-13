@@ -38,16 +38,6 @@
 #define MXR_ENABLE 1
 #define MXR_DISABLE 0
 
-/** description of a macroblock for packed formats */
-struct mxr_block {
-	/** vertical number of pixels in macroblock */
-	unsigned int width;
-	/** horizontal number of pixels in macroblock */
-	unsigned int height;
-	/** size of block in bytes */
-	unsigned int size;
-};
-
 /** description of supported format */
 struct mxr_format {
 	/** format name/mnemonic */
@@ -58,8 +48,6 @@ struct mxr_format {
 	enum v4l2_colorspace colorspace;
 	/** number of planes in image data */
 	int num_planes;
-	/** description of block for each plane */
-	struct mxr_block plane[MXR_MAX_PLANES];
 	/** number of subframes in image data */
 	int num_subframes;
 	/** specifies to which subframe belong given plane */
@@ -308,8 +296,8 @@ void mxr_layer_release(struct mxr_layer *layer);
 int mxr_base_layer_register(struct mxr_layer *layer);
 void mxr_base_layer_unregister(struct mxr_layer *layer);
 
-unsigned long mxr_get_plane_size(const struct mxr_block *blk,
-	unsigned int width, unsigned int height);
+unsigned long mxr_get_luma_size(u32 fourcc, unsigned int width,
+	unsigned int height);
 
 /** adds new consumer for mixer's power */
 int __must_check mxr_power_get(struct mxr_device *mdev);

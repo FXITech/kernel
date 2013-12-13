@@ -23,10 +23,6 @@ static const struct mxr_format mxr_fmt_nv12 = {
 	.fourcc = V4L2_PIX_FMT_NV12,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.num_planes = 2,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 1 },
-		{ .width = 2, .height = 2, .size = 2 },
-	},
 	.num_subframes = 1,
 	.cookie = VP_MODE_NV12 | VP_MODE_MEM_LINEAR,
 };
@@ -36,10 +32,6 @@ static const struct mxr_format mxr_fmt_nv21 = {
 	.fourcc = V4L2_PIX_FMT_NV21,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.num_planes = 2,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 1 },
-		{ .width = 2, .height = 2, .size = 2 },
-	},
 	.num_subframes = 1,
 	.cookie = VP_MODE_NV21 | VP_MODE_MEM_LINEAR,
 };
@@ -49,12 +41,7 @@ static const struct mxr_format mxr_fmt_nv12m = {
 	.fourcc = V4L2_PIX_FMT_NV12M,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.num_planes = 2,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 1 },
-		{ .width = 2, .height = 2, .size = 2 },
-	},
 	.num_subframes = 2,
-	.plane2subframe = {0, 1},
 	.cookie = VP_MODE_NV12 | VP_MODE_MEM_LINEAR,
 };
 
@@ -63,12 +50,7 @@ static const struct mxr_format mxr_fmt_nv12mt = {
 	.fourcc = V4L2_PIX_FMT_NV12MT,
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.num_planes = 2,
-	.plane = {
-		{ .width = 128, .height = 32, .size = 4096 },
-		{ .width = 128, .height = 32, .size = 2048 },
-	},
 	.num_subframes = 2,
-	.plane2subframe = {0, 1},
 	.cookie = VP_MODE_NV12 | VP_MODE_MEM_TILED,
 };
 
@@ -101,11 +83,10 @@ static void mxr_vp_buffer_set(struct mxr_layer *layer,
 	if (layer->fmt->num_subframes == 2) {
 		chroma_addr[0] = vb2_dma_contig_plane_dma_addr(&buf->vb, 1);
 	} else {
-		/* FIXME: mxr_get_plane_size compute integer division,
-		 * which is slow and should not be performed in interrupt */
-		chroma_addr[0] = luma_addr[0] + mxr_get_plane_size(
-			&layer->fmt->plane[0], layer->geo.src.full_width,
-			layer->geo.src.full_height);
+		chroma_addr[0] = luma_addr[0] +
+			mxr_get_luma_size(layer->fmt->fourcc,
+				layer->geo.src.full_width,
+				layer->geo.src.full_height);
 	}
 	if (layer->fmt->cookie & VP_MODE_MEM_TILED) {
 		luma_addr[1] = luma_addr[0] + 0x40;

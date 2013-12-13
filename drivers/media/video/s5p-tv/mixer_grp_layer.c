@@ -22,9 +22,6 @@ static const struct mxr_format mxr_fb_fmt_rgb565 = {
 	.fourcc = V4L2_PIX_FMT_RGB565,
 	.colorspace = V4L2_COLORSPACE_SRGB,
 	.num_planes = 1,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 2 },
-	},
 	.num_subframes = 1,
 	.cookie = 4,
 };
@@ -34,9 +31,6 @@ static const struct mxr_format mxr_fb_fmt_argb1555 = {
 	.num_planes = 1,
 	.fourcc = V4L2_PIX_FMT_RGB555,
 	.colorspace = V4L2_COLORSPACE_SRGB,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 2 },
-	},
 	.num_subframes = 1,
 	.cookie = 5,
 };
@@ -46,9 +40,6 @@ static const struct mxr_format mxr_fb_fmt_argb4444 = {
 	.num_planes = 1,
 	.fourcc = V4L2_PIX_FMT_RGB444,
 	.colorspace = V4L2_COLORSPACE_SRGB,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 2 },
-	},
 	.num_subframes = 1,
 	.cookie = 6,
 };
@@ -58,9 +49,6 @@ static const struct mxr_format mxr_fb_fmt_argb8888 = {
 	.fourcc = V4L2_PIX_FMT_BGR32,
 	.colorspace = V4L2_COLORSPACE_SRGB,
 	.num_planes = 1,
-	.plane = {
-		{ .width = 1, .height = 1, .size = 4 },
-	},
 	.num_subframes = 1,
 	.cookie = 7,
 };
