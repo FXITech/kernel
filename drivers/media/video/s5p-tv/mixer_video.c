@@ -896,7 +896,10 @@ static int queue_setup(struct vb2_queue *vq, const struct v4l2_format *pfmt,
 		alloc_ctxs[i] = layer->mdev->alloc_ctx;
 		//TODO(havardk): Hack: return double size for double buffering
 		// framebuffer.
-		sizes[i] = PAGE_ALIGN(planes[i].sizeimage * 2);
+                if (fmt->num_planes == 1)
+			sizes[i] = PAGE_ALIGN(planes[i].sizeimage * 2);
+                else
+			sizes[i] = planes[i].sizeimage;
 		mxr_dbg(mdev, "size[%d] = %08x\n", i, sizes[i]);
 	}
 
