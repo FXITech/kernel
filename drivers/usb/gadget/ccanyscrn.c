@@ -10,7 +10,7 @@
 #include <linux/platform_device.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
-#include "ccanyscrn.h"
+#include <linux/usb/ccanyscrn.h>
 
 #define DEVNAME "ccanyscrn"
 #define MAX_REQUESTS 128
