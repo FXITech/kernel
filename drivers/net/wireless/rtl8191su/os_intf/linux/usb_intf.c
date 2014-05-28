@@ -27,6 +27,7 @@
 #include <hal_init.h>
 #include <rtl8712_efuse.h>
 #include <version.h>
+#include <linux/module.h>
 
 #ifndef CONFIG_USB_HCI
 

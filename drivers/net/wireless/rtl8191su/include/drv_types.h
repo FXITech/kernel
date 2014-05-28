@@ -49,6 +49,7 @@
 
 #ifdef PLATFORM_LINUX
 #include <drv_types_linux.h>
+#include <linux/interrupt.h>
 #endif
 
 enum _NIC_VERSION {
